@@ -138,6 +138,12 @@
         <button id="join-btn">REJOINDRE LA PARTIE</button>
     </div>
 
+    <!-- Game Over Screen Mobile -->
+    <div id="game-over-screen" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.95); z-index: 1000; flex-direction: column; justify-content: center; align-items: center; padding: 20px;">
+        <h1 id="mobile-winner-text" style="font-size: 3rem; color: #fff; text-shadow: 0 0 15px #F1C40F;">FIN DE PARTIE</h1>
+        <p style="font-size: 1.5rem; color: #aaa; margin-top: 20px; text-align:center;">Regardez l'écran géant pour voir les résultats et relancer.</p>
+    </div>
+
     <!-- Game Screen -->
     <div id="game-screen" class="screen">
         <button id="uno-btn"
@@ -182,6 +188,7 @@
         let currentHand = [];
         let selectedCardElement = null; // Track card in center of screen
         let isVirus = false;
+        let isFrozen = false;
 
         const unoBtn = document.getElementById('uno-btn');
         unoBtn.addEventListener('click', () => {
@@ -279,8 +286,59 @@
             if (virusInterval) clearInterval(virusInterval);
         });
 
-        socket.on('game_over', () => {
+        socket.on('game_over', (data) => {
             if (virusInterval) clearInterval(virusInterval);
+            isFrozen = true; // Empêche de jeter plus de cartes
+            
+            const gameOverOverlay = document.getElementById('game-over-screen');
+            const mobileWinnerText = document.getElementById('mobile-winner-text');
+            gameOverOverlay.style.display = 'flex';
+            
+            let color = data.team === 'blue' ? '#3498DB' : '#F572F7';
+            mobileWinnerText.style.color = color;
+            mobileWinnerText.style.textShadow = `0 0 20px ${color}`;
+            
+            if (data.winner === username) {
+                mobileWinnerText.innerText = "VOUS AVEZ GAGNÉ !";
+            } else {
+                mobileWinnerText.innerText = `VICTOIRE DE\n${data.winner}`;
+            }
+            if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
+        });
+        
+        // Relance après la fin
+        socket.on('game_started', () => {
+             const gameOverOverlay = document.getElementById('game-over-screen');
+             gameOverOverlay.style.display = 'none';
+             isFrozen = false;
+        });
+
+        // --- ATTAQUES & GELS ---
+        socket.on('attacked', (data) => {
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            
+            const overlay = document.createElement('div');
+            overlay.style = "position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(231,76,60,0.8); z-index:200; display:flex; justify-content:center; align-items:center; padding: 20px; box-sizing:border-box;";
+            overlay.innerHTML = `<h2 style="color:white; font-size:2.5rem; text-align:center; text-shadow:0 0 10px white;">Attaqué par ${data.by} !<br>+${data.cards} Cartes</h2>`;
+            document.body.appendChild(overlay);
+            
+            setTimeout(() => overlay.remove(), 2500);
+        });
+
+        socket.on('freeze_team', (data) => {
+            if (isFrozen) return; // Déjà gelé
+            isFrozen = true;
+            if (navigator.vibrate) navigator.vibrate(500);
+            
+            const overlay = document.createElement('div');
+            overlay.style = "position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(52,152,219,0.8); z-index:200; display:flex; justify-content:center; align-items:center; padding: 20px; box-sizing:border-box;";
+            overlay.innerHTML = `<h2 style="color:white; font-size:3rem; text-align:center; text-shadow:0 0 15px white;">❄️ GELÉ par ${data.by} ! ❄️</h2>`;
+            document.body.appendChild(overlay);
+            
+            setTimeout(() => {
+                if (document.body.contains(overlay)) overlay.remove();
+                isFrozen = false;
+            }, 3000);
         });
 
         function renderHand() {
@@ -332,6 +390,9 @@
             });
 
             cardElement.addEventListener('touchend', (e) => {
+                // Freeze check
+                if (isFrozen) return;
+                
                 let touchEndY = e.changedTouches[0].screenY;
                 // Detect swipe up (start > end by at least 50px)
                 if (touchStartY - touchEndY > 50) {
@@ -459,6 +520,8 @@
         }
 
         function triggerAction(cardElement) {
+            if (isFrozen) return; // Bloqué par une carte de l'adversaire
+            
             // Re-use logic from swipe
             cardElement.style.transform = 'translateY(-500px) scale(0.5)';
             cardElement.style.opacity = '0';

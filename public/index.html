@@ -46,7 +46,8 @@
                 style="display: none; position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); z-index:200; justify-content:center; align-items:center; flex-direction:column;">
                 <h1 id="winner-text" style="font-size: 6rem; color: white; text-shadow: 0 0 30px #F1C40F;">VICTOIRE !
                 </h1>
-                <p style="font-size: 2rem; color: white;">La partie est terminée.</p>
+                <p style="font-size: 2rem; color: white; margin-bottom: 20px;">La partie est terminée.</p>
+                <button id="restart-btn" style="padding: 15px 40px; font-size: 2rem; background: #2ECC71; border: none; color: white; cursor: pointer; border-radius: 10px; box-shadow: 0 0 20px #2ECC71;">NOUVELLE PARTIE</button>
             </div>
 
             <div id="deck-area">
@@ -114,6 +115,7 @@
 
         // --- Game/Event Logic ---
         const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
         const centerCard = document.getElementById('center-card');
         const blueScore = document.getElementById('blue-score');
         const magentaScore = document.getElementById('magenta-score');
@@ -126,9 +128,17 @@
             startBtn.style.display = 'none';
         });
 
+        restartBtn.addEventListener('click', () => {
+            socket.emit('start_game');
+            gameOverOverlay.style.display = 'none';
+        });
+
         socket.on('game_started', (data) => {
             startBtn.style.display = 'none';
+            gameOverOverlay.style.display = 'none';
             updateCenterCard(data.currentCard);
+            blueScore.style.width = `50%`;
+            magentaScore.style.width = `50%`;
         });
 
         socket.on('card_played_success', (data) => {
