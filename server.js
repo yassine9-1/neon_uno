@@ -156,8 +156,12 @@ app.get('/api/server-info', async (req, res) => {
         }
     }
 
-    // Utilisation d'un certificat HTTPS auto-signé et de l'IP locale pour un lien fixe
-    const playerUrl = `https://${localIp}:${PORT}/player`;
+    // NOUVEAU : En mode dev, on pointe vers le serveur Vite (5173)
+    const isDev = process.env.NODE_ENV !== 'production';
+    const playerPort = isDev ? 5173 : PORT;
+    const protocol = 'https';
+    const playerUrl = `${protocol}://${localIp}:${playerPort}/player`;
+    
     try {
         const qrCodeDataUrl = await qrcode.toDataURL(playerUrl, {
             color: { dark: '#0b0f19', light: '#72EFF9' }
