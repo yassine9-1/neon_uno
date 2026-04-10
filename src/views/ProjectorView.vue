@@ -1,12 +1,83 @@
 <template>
   <div id="particles-container" ref="particlesContainer"></div>
-  <div class="container">
+
+  <!-- ===================== LOBBY SCREEN ===================== -->
+  <div v-if="!gameStarted && !isGameOver" class="lobby">
+    <!-- Top bar: title + QR code -->
+    <div class="lobby-top">
+      <h1 class="neon-text lobby-title">NEON-UNO</h1>
+      <div class="lobby-qr-block">
+        <p class="lobby-scan-label">📱 Scanner pour rejoindre</p>
+        <img v-if="qrCode" class="lobby-qrcode" :src="qrCode" alt="QR Code" />
+        <p class="lobby-url">{{ serverUrl }}</p>
+      </div>
+    </div>
+
+    <!-- Teams area -->
+    <div class="lobby-teams">
+      <!-- TEAM BLUE -->
+      <div
+        class="team-column team-blue"
+        @dragover.prevent
+        @drop="onDropToTeam($event, 'blue')"
+      >
+        <h2 class="team-title blue-title">🟦 ÉQUIPE BLEUE</h2>
+        <div class="team-player-list">
+          <div
+            v-for="player in bluePlayers"
+            :key="player.id"
+            class="lobby-player blue-player"
+            draggable="true"
+            @dragstart="onDragStart($event, player.id)"
+          >
+            {{ player.username }}
+          </div>
+          <div v-if="bluePlayers.length === 0" class="empty-slot">En attente…</div>
+        </div>
+      </div>
+
+      <!-- Center divider -->
+      <div class="lobby-divider">
+        <span class="vs-text">VS</span>
+      </div>
+
+      <!-- TEAM MAGENTA -->
+      <div
+        class="team-column team-magenta"
+        @dragover.prevent
+        @drop="onDropToTeam($event, 'magenta')"
+      >
+        <h2 class="team-title magenta-title">🟣 ÉQUIPE ROSE</h2>
+        <div class="team-player-list">
+          <div
+            v-for="player in magentaPlayers"
+            :key="player.id"
+            class="lobby-player magenta-player"
+            draggable="true"
+            @dragstart="onDragStart($event, player.id)"
+          >
+            {{ player.username }}
+          </div>
+          <div v-if="magentaPlayers.length === 0" class="empty-slot">En attente…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Start button -->
+    <div class="lobby-footer">
+      <button class="start-btn" @click="startGame">
+        🚀 DÉMARRER LA BATAILLE
+      </button>
+    </div>
+  </div>
+
+  <!-- ===================== GAME SCREEN ===================== -->
+  <div v-if="gameStarted || isGameOver" class="container">
     <header>
       <h1 class="neon-text">NEON-UNO</h1>
-      <div id="connection-info">
-        <p>Scanner pour rejoindre !</p>
-        <img v-if="qrCode" id="qrcode" :src="qrCode" alt="QR Code" />
-        <p id="server-url">{{ serverUrl || 'Chargement de l\'URL...' }}</p>
+      <div id="connection-info-small">
+        <img v-if="qrCode" id="qrcode-small" :src="qrCode" alt="QR Code" />
+        <p id="server-url-small">{{ serverUrl }}</p>
       </div>
     </header>
 
@@ -34,7 +105,7 @@
         style="display:flex;position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:200;justify-content:center;align-items:center;flex-direction:column;">
         <h1 id="winner-text"
           :style="{ fontSize: '6rem', color: 'white', textShadow: '0 0 30px ' + winnerColor }">
-          VICTOIRE !
+          {{ winnerForced ? '🛑 FIN FORCÉE' : 'VICTOIRE !' }}
         </h1>
         <p style="font-size:2rem;color:white;margin-bottom:20px;">{{ winnerMessage }}</p>
         <button @click="restartGame"
@@ -44,10 +115,6 @@
       </div>
 
       <div id="deck-area">
-        <button v-if="!gameStarted" @click="startGame"
-          style="padding:15px 30px;font-size:1.5rem;background:var(--neon-magenta);border:none;color:white;cursor:pointer;border-radius:10px;margin-right:50px;">
-          DÉMARRER LA BATAILLE
-        </button>
         <div class="card center-card" :class="{ empty: !currentCard, 'animated-play': cardAnimating }"
           :style="currentCard ? { backgroundColor: colorMap[currentCard.color], borderColor: 'white' } : {}">
           {{ currentCard ? currentCard.value.toUpperCase() : 'UNO' }}
@@ -69,14 +136,20 @@
           </div>
         </div>
       </div>
+
+      <!-- Force end game button -->
+      <div style="text-align:center;margin-top:10px;">
+        <button @click="forceEndGame"
+          style="padding:10px 25px;font-size:1rem;background:#E74C3C;border:none;color:white;cursor:pointer;border-radius:8px;box-shadow:0 0 15px #E74C3C;opacity:0.85;">
+          🛑 FORCER LA FIN
+        </button>
+      </div>
     </main>
   </div>
-
-  <!-- Feedback text (appended dynamically) -->
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import socket from '../socket.js'
 
 const particlesContainer = ref(null)
@@ -91,7 +164,14 @@ const isGameOver = ref(false)
 const gameStarted = ref(false)
 const winnerMessage = ref('')
 const winnerColor = ref('#F1C40F')
+const winnerForced = ref(false)
 const cardAnimating = ref(false)
+
+// Drag-and-drop state
+let draggedPlayerId = null
+
+const bluePlayers = computed(() => Object.values(players).filter(p => p.team === 'blue'))
+const magentaPlayers = computed(() => Object.values(players).filter(p => p.team === 'magenta'))
 
 const colorMap = {
   red: '#E74C3C',
@@ -115,14 +195,35 @@ function startGame() {
 }
 
 function restartGame() {
-  socket.emit('start_game')
+  winnerForced.value = false
   isGameOver.value = false
+  gameStarted.value = false
+}
+
+function forceEndGame() {
+  socket.emit('force_end_game')
+}
+
+// Drag-and-drop handlers
+function onDragStart(event, playerId) {
+  draggedPlayerId = playerId
+  event.dataTransfer.effectAllowed = 'move'
+}
+
+function onDropToTeam(event, newTeam) {
+  if (!draggedPlayerId) return
+  const player = players[draggedPlayerId]
+  if (player && player.team !== newTeam) {
+    socket.emit('change_player_team', { playerId: draggedPlayerId, newTeam })
+    // Optimistic update
+    players[draggedPlayerId].team = newTeam
+  }
+  draggedPlayerId = null
 }
 
 function updateCenterCard(card) {
   currentCard.value = card
   cardAnimating.value = false
-  // Force reflow then re-enable animation
   requestAnimationFrame(() => {
     cardAnimating.value = true
     setTimeout(() => { cardAnimating.value = false }, 600)
@@ -190,6 +291,12 @@ socket.on('player_left', (playerId) => {
   delete players[playerId]
 })
 
+socket.on('team_changed', ({ playerId, newTeam }) => {
+  if (players[playerId]) {
+    players[playerId].team = newTeam
+  }
+})
+
 socket.on('game_started', (data) => {
   gameStarted.value = true
   isGameOver.value = false
@@ -229,8 +336,11 @@ socket.on('virus_resolved', (infectedPlayers) => {
 socket.on('game_over', (data) => {
   isGameOver.value = true
   gameStarted.value = false
-  winnerMessage.value = `VICTOIRE DE ${data.winner.toUpperCase()} !`
-  winnerColor.value = data.team === 'blue' ? '#3498DB' : '#F572F7'
+  winnerForced.value = !!data.forced
+  winnerMessage.value = data.forced
+    ? data.winner
+    : `VICTOIRE DE ${data.winner.toUpperCase()} !`
+  winnerColor.value = data.team === 'blue' ? '#3498DB' : data.team === 'magenta' ? '#F572F7' : '#F1C40F'
 })
 
 onMounted(() => {
@@ -241,6 +351,7 @@ onUnmounted(() => {
   if (particleInterval) clearInterval(particleInterval)
   socket.off('player_joined')
   socket.off('player_left')
+  socket.off('team_changed')
   socket.off('game_started')
   socket.off('card_played_success')
   socket.off('virus_event')
@@ -248,3 +359,229 @@ onUnmounted(() => {
   socket.off('game_over')
 })
 </script>
+
+<style scoped>
+/* ===== LOBBY ===== */
+.lobby {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-color);
+  overflow: hidden;
+}
+
+.lobby-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 40px;
+  border-bottom: 2px solid var(--neon-blue);
+  box-shadow: 0 0 20px rgba(114, 239, 249, 0.4);
+}
+
+.lobby-title {
+  font-size: 5rem;
+  margin: 0;
+}
+
+.lobby-qr-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.lobby-scan-label {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--neon-blue);
+  text-shadow: 0 0 8px var(--neon-blue);
+}
+
+.lobby-qrcode {
+  width: 220px;
+  height: 220px;
+  border: 3px solid var(--neon-blue);
+  border-radius: 12px;
+  padding: 6px;
+  background: #0b0f19;
+  box-shadow: 0 0 20px var(--neon-blue);
+}
+
+.lobby-url {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--neon-blue);
+  opacity: 0.8;
+}
+
+/* Teams area */
+.lobby-teams {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.team-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 30px;
+  transition: background 0.2s;
+  min-height: 0;
+}
+
+.team-column[data-drag-over] {
+  opacity: 0.8;
+}
+
+.team-blue {
+  border-right: 1px solid rgba(52, 152, 219, 0.3);
+  background: rgba(52, 152, 219, 0.05);
+}
+
+.team-magenta {
+  background: rgba(245, 114, 247, 0.05);
+}
+
+.team-title {
+  font-size: 2rem;
+  margin: 0 0 20px 0;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.blue-title {
+  color: #3498DB;
+  text-shadow: 0 0 15px #3498DB, 0 0 30px #3498DB;
+}
+
+.magenta-title {
+  color: #F572F7;
+  text-shadow: 0 0 15px #F572F7, 0 0 30px #F572F7;
+}
+
+.team-player-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 300px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.lobby-player {
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 1.4rem;
+  font-weight: bold;
+  cursor: grab;
+  user-select: none;
+  text-align: center;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.lobby-player:active {
+  cursor: grabbing;
+  transform: scale(1.05);
+}
+
+.blue-player {
+  background: rgba(52, 152, 219, 0.15);
+  border: 2px solid #3498DB;
+  box-shadow: 0 0 12px #3498DB;
+  color: #fff;
+}
+
+.magenta-player {
+  background: rgba(245, 114, 247, 0.15);
+  border: 2px solid #F572F7;
+  box-shadow: 0 0 12px #F572F7;
+  color: #fff;
+}
+
+.empty-slot {
+  color: rgba(255,255,255,0.25);
+  font-style: italic;
+  font-size: 1.1rem;
+  text-align: center;
+  padding: 10px;
+}
+
+.lobby-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.vs-text {
+  font-size: 3rem;
+  font-weight: 900;
+  color: white;
+  text-shadow:
+    0 0 10px #fff,
+    0 0 20px var(--neon-magenta),
+    0 0 40px var(--neon-magenta);
+  animation: pulse 1.5s infinite alternate;
+}
+
+.lobby-footer {
+  padding: 20px 40px;
+  display: flex;
+  justify-content: center;
+  border-top: 2px solid rgba(255,255,255,0.1);
+  background: rgba(0,0,0,0.3);
+}
+
+.start-btn {
+  padding: 20px 60px;
+  font-size: 2rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 15px;
+  background: linear-gradient(135deg, var(--neon-magenta), #c050c0);
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 0 30px var(--neon-magenta), 0 0 60px rgba(245,114,247,0.4);
+  transition: transform 0.15s, box-shadow 0.15s;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.start-btn:hover {
+  transform: scale(1.04);
+  box-shadow: 0 0 40px var(--neon-magenta), 0 0 80px rgba(245,114,247,0.5);
+}
+
+/* ===== GAME SCREEN – small QR ===== */
+#connection-info-small {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+#qrcode-small {
+  width: 80px;
+  height: 80px;
+  border: 2px solid var(--neon-blue);
+  border-radius: 6px;
+  padding: 3px;
+  background: #0b0f19;
+}
+
+#server-url-small {
+  font-size: 0.75rem;
+  color: var(--neon-blue);
+  margin: 0;
+  opacity: 0.7;
+}
+</style>
+

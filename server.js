@@ -180,8 +180,10 @@ io.on('connection', (socket) => {
     socket.on('join_game', (username) => {
         console.log(`[PLAYER] ${username} joined (${socket.id})`);
 
-        // Assign random team
-        const team = Math.random() < 0.5 ? 'blue' : 'magenta';
+        // Assign to team with fewer players for balance
+        const bluePlayers = Object.values(gameState.players).filter(p => p.team === 'blue').length;
+        const magentaPlayers = Object.values(gameState.players).filter(p => p.team === 'magenta').length;
+        const team = bluePlayers <= magentaPlayers ? 'blue' : 'magenta';
 
         gameState.players[socket.id] = {
             id: socket.id,
@@ -195,13 +197,12 @@ io.on('connection', (socket) => {
         // Notify the main screen (projector)
         socket.broadcast.emit('player_joined', { id: socket.id, username, team });
 
-        // Send a success message back to the player
-        socket.emit('joined_success', { username, team });
+        // Send a success message back to the player (include gameInProgress flag)
+        socket.emit('joined_success', { username, team, gameInProgress: gameState.isStarted });
 
-        // S'il rejoint une partie déjà lancée
+        // S'il rejoint une partie déjà lancée, ne pas distribuer de cartes — attendre la prochaine
         if (gameState.isStarted) {
-            gameState.players[socket.id].hand = gameState.deck.splice(0, 7);
-            socket.emit('your_hand', gameState.players[socket.id].hand);
+            socket.emit('game_in_progress');
         }
     });
 
@@ -214,6 +215,23 @@ io.on('connection', (socket) => {
         for (let playerId in gameState.players) {
             io.to(playerId).emit('your_hand', gameState.players[playerId].hand);
         }
+    });
+
+    // Change a player's team (only before the game starts, from projector)
+    socket.on('change_player_team', ({ playerId, newTeam }) => {
+        if (gameState.isStarted) return;
+        if (gameState.players[playerId]) {
+            gameState.players[playerId].team = newTeam;
+            io.emit('team_changed', { playerId, newTeam });
+        }
+    });
+
+    // Force end the current game from the projector
+    socket.on('force_end_game', () => {
+        if (!gameState.isStarted) return;
+        gameState.isStarted = false;
+        if (gameState.virusTimeout) clearTimeout(gameState.virusTimeout);
+        io.emit('game_over', { winner: 'Partie terminée par l\'organisateur', team: 'none', forced: true });
     });
 
     // Handle play card attempt (Fastest wins)
