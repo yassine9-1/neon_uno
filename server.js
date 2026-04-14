@@ -257,8 +257,9 @@ io.on('connection', (socket) => {
         const cardToPlay = player.hand[cardIndex];
         const current = gameState.currentCard;
 
-        // Validation Rule: match color, match value, or wild card
+        // Validation Rule: match color, match value, wild card, OR if current card is black (acts as a reset for the next immediate card)
         const isValid =
+            current.color === 'black' || 
             cardToPlay.color === current.color ||
             cardToPlay.value === current.value ||
             cardToPlay.color === 'black';
