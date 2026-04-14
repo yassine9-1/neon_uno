@@ -1,6 +1,6 @@
 <template>
   <div id="particles-container" ref="particlesContainer"></div>
-  
+
   <!-- Laser Beam SVG Canvas -->
   <svg id="laser-canvas" preserveAspectRatio="none">
     <line v-for="laser in lasers" :key="laser.id" 
@@ -11,7 +11,78 @@
           class="laser-beam" />
   </svg>
 
-  <div class="projector-container">
+  <!-- ===================== LOBBY SCREEN ===================== -->
+  <div v-if="!gameStarted && !isGameOver" class="lobby">
+    <!-- Top bar: title + QR code -->
+    <div class="lobby-top">
+      <h1 class="neon-text lobby-title">NEON-UNO</h1>
+      <div class="lobby-qr-block">
+        <p class="lobby-scan-label">📱 Scanner pour rejoindre</p>
+        <img v-if="qrCode" class="lobby-qrcode" :src="qrCode" alt="QR Code" />
+        <p class="lobby-url">{{ serverUrl }}</p>
+      </div>
+    </div>
+
+    <!-- Teams area -->
+    <div class="lobby-teams">
+      <!-- TEAM BLUE -->
+      <div
+        class="team-column team-blue"
+        @dragover.prevent
+        @drop="onDropToTeam($event, 'blue')"
+      >
+        <h2 class="team-title blue-title">🟦 ÉQUIPE BLEUE</h2>
+        <div class="team-player-list">
+          <div
+            v-for="player in bluePlayers"
+            :key="player.id"
+            class="lobby-player blue-player"
+            draggable="true"
+            @dragstart="onDragStart($event, player.id)"
+          >
+            {{ player.username }}
+          </div>
+          <div v-if="bluePlayers.length === 0" class="empty-slot">En attente…</div>
+        </div>
+      </div>
+
+      <!-- Center divider -->
+      <div class="lobby-divider">
+        <span class="vs-text">VS</span>
+      </div>
+
+      <!-- TEAM MAGENTA -->
+      <div
+        class="team-column team-magenta"
+        @dragover.prevent
+        @drop="onDropToTeam($event, 'magenta')"
+      >
+        <h2 class="team-title magenta-title">🟣 ÉQUIPE ROSE</h2>
+        <div class="team-player-list">
+          <div
+            v-for="player in magentaPlayers"
+            :key="player.id"
+            class="lobby-player magenta-player"
+            draggable="true"
+            @dragstart="onDragStart($event, player.id)"
+          >
+            {{ player.username }}
+          </div>
+          <div v-if="magentaPlayers.length === 0" class="empty-slot">En attente…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Start button -->
+    <div class="lobby-footer">
+      <button class="start-btn" @click="startGame">
+        🚀 DÉMARRER LA BATAILLE
+      </button>
+    </div>
+  </div>
+
+  <!-- ===================== GAME SCREEN ===================== -->
+  <div v-else class="projector-container">
     <!-- Header Level -->
     <div class="top-row-header">
       <h1 class="neon-text logo-left">NEON-UNO</h1>
@@ -41,7 +112,9 @@
 
       <!-- Overlay Fin de partie -->
       <div v-show="isGameOver" class="overlay gameover-overlay">
-        <h1 id="winner-text" :style="{ color: 'white', textShadow: '0 0 30px ' + winnerColor }">VICTOIRE !</h1>
+        <h1 id="winner-text" :style="{ color: 'white', textShadow: '0 0 30px ' + winnerColor }">
+          {{ winnerForced ? '🛑 FIN FORCÉE' : 'VICTOIRE !' }}
+        </h1>
         <p>{{ winnerMessage }}</p>
         <button @click="restartGame" class="restart-btn">NOUVELLE PARTIE</button>
       </div>
@@ -52,16 +125,17 @@
         <div class="sci-fi-ring outer"></div>
         <div class="sci-fi-ring inner"></div>
 
-        <button v-if="!gameStarted" @click="startGame" class="start-btn">DÉMARRER LA BATAILLE</button>
-
         <div v-if="cardPile.length === 0" class="card empty">UNO</div>
 
         <div
           v-for="(entry, index) in cardPile"
           :key="entry.id"
           class="card pile-card"
+          :class="{ 'rainbow-neon': entry.card.color === 'black' }"
           :style="getPileCardStyle(index, entry)"
-        >{{ entry.card.value.toUpperCase() }}</div>
+        >
+          <img :src="getCardSymbol(entry.card)" class="card-symbol" />
+        </div>
       </div>
 
       <!-- Distributed Players -->
@@ -78,6 +152,14 @@
           <div class="player-name" :class="[p.team]">{{ p.username }}</div>
         </div>
       </div>
+
+      <!-- Force end game button -->
+      <div style="position: absolute; bottom: 20px; width: 100%; text-align: center; z-index: 100;">
+        <button @click="forceEndGame"
+          style="padding:10px 25px;font-size:1rem;background:#E74C3C;border:none;color:white;cursor:pointer;border-radius:8px;box-shadow:0 0 15px #E74C3C;opacity:0.85;">
+          🛑 FORCER LA FIN
+        </button>
+      </div>
     </main>
   </div>
 
@@ -92,7 +174,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import socket from '../socket.js'
 
 const particlesContainer = ref(null)
@@ -107,6 +189,7 @@ const isGameOver = ref(false)
 const gameStarted = ref(false)
 const winnerMessage = ref('')
 const winnerColor = ref('#F1C40F')
+const winnerForced = ref(false)
 
 // Lasers effect
 const lasers = ref([])
@@ -119,12 +202,57 @@ const deckRadius = ref(300)
 const showSettings = ref(false)
 let cardIdCounter = 0
 
-const colorMap = {
+// Drag-and-drop state
+let draggedPlayerId = null
+
+const bluePlayers = computed(() => Object.values(players).filter(p => p.team === 'blue'))
+const magentaPlayers = computed(() => Object.values(players).filter(p => p.team === 'magenta'))
+
+const baseColorMap = {
+  red: '#2C0B0B',
+  blue: '#0B1A2C',
+  green: '#0B2C14',
+  yellow: '#2C260B',
+  black: '#0B0F19'
+}
+
+const neonColorMap = {
   red: '#E74C3C',
-  blue: '#3498DB',
+  blue: '#72EFF9',
   green: '#2ECC71',
   yellow: '#F1C40F',
-  black: '#333'
+  black: '#F572F7'
+}
+
+function getCardBgStyle(card) {
+  if (!card) return {}
+  const bgName = card.color === 'black' ? 'card_special' : `card_${card.color}`
+  
+  const style = {
+    backgroundImage: `url(/assets/cards/backgrounds/${bgName}.png)`,
+    backgroundSize: '100% 100%',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    backgroundColor: baseColorMap[card.color] || '#1a1a2e'
+  }
+ 
+  // Only apply static glow if it's NOT a rainbow (black) card
+  if (card.color !== 'black') {
+    const glowColor = neonColorMap[card.color] || '#ffffff'
+    style.border = `3px solid ${glowColor}`
+    style.boxShadow = `0 0 20px ${glowColor}, inset 0 0 20px ${glowColor}`
+  }
+
+  return style
+}
+
+function getCardSymbol(card) {
+  if (!card) return ''
+  if (!isNaN(parseInt(card.value))) {
+    return `/assets/cards/symbols/num_${card.value}.png`
+  } else {
+    return `/assets/cards/symbols/action_${card.value}.png`
+  }
 }
 
 fetch('/api/server-info')
@@ -142,12 +270,33 @@ const blueRatio = computed(() => {
 
 function startGame() {
   socket.emit('start_game')
-  gameStarted.value = true
 }
 
 function restartGame() {
-  socket.emit('start_game')
+  winnerForced.value = false
   isGameOver.value = false
+  gameStarted.value = false
+}
+
+function forceEndGame() {
+  socket.emit('force_end_game')
+}
+
+// Drag-and-drop handlers
+function onDragStart(event, playerId) {
+  draggedPlayerId = playerId
+  event.dataTransfer.effectAllowed = 'move'
+}
+
+function onDropToTeam(event, newTeam) {
+  if (!draggedPlayerId) return
+  const player = players[draggedPlayerId]
+  if (player && player.team !== newTeam) {
+    socket.emit('change_player_team', { playerId: draggedPlayerId, newTeam })
+    // Optimistic update
+    players[draggedPlayerId].team = newTeam
+  }
+  draggedPlayerId = null
 }
 
 // Calculate player absolute coordinates in an arc
@@ -157,13 +306,10 @@ const positionedPlayers = computed(() => {
   const result = []
 
   // Spread angle limit: covering ~140 degrees of the arc.
-  // We offset it slightly down (the central table is often the lower-middle focus).
   const calculateArc = (teamPlayers, isLeft) => {
     const len = teamPlayers.length
     teamPlayers.forEach((p, idx) => {
-      // parameter t from 0 to 1
       const t = len === 1 ? 0.5 : idx / (len - 1)
-      // angle ranges from -60deg (-PI/3) to +60deg (+PI/3)
       const angle = (t - 0.5) * Math.PI * 0.7 
       
       const rx = 35 // horizontal radius limit 35% of width
@@ -227,15 +373,15 @@ function getPileCardStyle(index, entry) {
     scale = Math.max(0.75, 1 - index * 0.008)
   }
 
+  const bgStyle = getCardBgStyle(entry.card)
+
   return {
     position: 'absolute',
     left: '50%',
     top: '50%',
     transform: `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) rotate(${rotation}deg) scale(${scale})`,
     zIndex: n + 1 - index,
-    backgroundColor: colorMap[entry.card.color],
-    borderColor: 'white',
-    boxShadow: `0 0 20px ${colorMap[entry.card.color]}`,
+    ...bgStyle,
     opacity,
     transition: index === 0 ? 'none' : 'transform 0.55s ease-out, opacity 0.55s ease-out',
   }
@@ -313,6 +459,12 @@ socket.on('player_left', (playerId) => {
   delete players[playerId]
 })
 
+socket.on('team_changed', ({ playerId, newTeam }) => {
+  if (players[playerId]) {
+    players[playerId].team = newTeam
+  }
+})
+
 socket.on('game_started', (data) => {
   gameStarted.value = true
   isGameOver.value = false
@@ -330,7 +482,7 @@ socket.on('card_played_success', (data) => {
   magentaWidth.value = m
 
   createExplosion()
-  fireLaser(data.username) // Fire laser to the player!
+  fireLaser(data.username)
 
   if (data.unoOupli) {
     showFeedback(`OBLI DE UNO ! +2 pour ${data.username}`, '#E74C3C')
@@ -353,8 +505,11 @@ socket.on('virus_resolved', (infectedPlayers) => {
 socket.on('game_over', (data) => {
   isGameOver.value = true
   gameStarted.value = false
-  winnerMessage.value = `VICTOIRE DE ${data.winner.toUpperCase()} !`
-  winnerColor.value = data.team === 'blue' ? '#3498DB' : '#F572F7'
+  winnerForced.value = !!data.forced
+  winnerMessage.value = data.forced
+    ? data.winner
+    : `VICTOIRE DE ${data.winner.toUpperCase()} !`
+  winnerColor.value = data.team === 'blue' ? '#3498DB' : data.team === 'magenta' ? '#F572F7' : '#F1C40F'
 })
 
 onMounted(() => {
@@ -369,6 +524,7 @@ onUnmounted(() => {
   if (resizeObserver) resizeObserver.disconnect()
   socket.off('player_joined')
   socket.off('player_left')
+  socket.off('team_changed')
   socket.off('game_started')
   socket.off('card_played_success')
   socket.off('virus_event')
@@ -378,6 +534,201 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* ===== LOBBY ===== */
+.lobby {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-color);
+  overflow: hidden;
+}
+
+.lobby-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 40px;
+  border-bottom: 2px solid var(--neon-blue);
+  box-shadow: 0 0 20px rgba(114, 239, 249, 0.4);
+}
+
+.lobby-title {
+  font-size: 5rem;
+  margin: 0;
+}
+
+.lobby-qr-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.lobby-scan-label {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--neon-blue);
+  text-shadow: 0 0 8px var(--neon-blue);
+}
+
+.lobby-qrcode {
+  width: 220px;
+  height: 220px;
+  border: 3px solid var(--neon-blue);
+  border-radius: 12px;
+  padding: 6px;
+  background: #0b0f19;
+  box-shadow: 0 0 20px var(--neon-blue);
+}
+
+.lobby-url {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--neon-blue);
+  opacity: 0.8;
+}
+
+/* Teams area */
+.lobby-teams {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.team-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 30px;
+  transition: background 0.2s;
+  min-height: 0;
+}
+
+.team-blue {
+  border-right: 1px solid rgba(52, 152, 219, 0.3);
+  background: rgba(52, 152, 219, 0.05);
+}
+
+.team-magenta {
+  background: rgba(245, 114, 247, 0.05);
+}
+
+.team-title {
+  font-size: 2rem;
+  margin: 0 0 20px 0;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.blue-title {
+  color: #3498DB;
+  text-shadow: 0 0 15px #3498DB, 0 0 30px #3498DB;
+}
+
+.magenta-title {
+  color: #F572F7;
+  text-shadow: 0 0 15px #F572F7, 0 0 30px #F572F7;
+}
+
+.team-player-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 300px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.lobby-player {
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 1.4rem;
+  font-weight: bold;
+  cursor: grab;
+  user-select: none;
+  text-align: center;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.lobby-player:active {
+  cursor: grabbing;
+  transform: scale(1.05);
+}
+
+.blue-player {
+  background: rgba(52, 152, 219, 0.15);
+  border: 2px solid #3498DB;
+  box-shadow: 0 0 12px #3498DB;
+  color: #fff;
+}
+
+.magenta-player {
+  background: rgba(245, 114, 247, 0.15);
+  border: 2px solid #F572F7;
+  box-shadow: 0 0 12px #F572F7;
+  color: #fff;
+}
+
+.empty-slot {
+  color: rgba(255,255,255,0.25);
+  font-style: italic;
+  font-size: 1.1rem;
+  text-align: center;
+  padding: 10px;
+}
+
+.lobby-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.vs-text {
+  font-size: 3rem;
+  font-weight: 900;
+  color: white;
+  text-shadow:
+    0 0 10px #fff,
+    0 0 20px var(--neon-magenta),
+    0 0 40px var(--neon-magenta);
+  animation: pulse 1.5s infinite alternate;
+}
+
+.lobby-footer {
+  padding: 20px 40px;
+  display: flex;
+  justify-content: center;
+  border-top: 2px solid rgba(255,255,255,0.1);
+  background: rgba(0,0,0,0.3);
+}
+
+.start-btn {
+  padding: 20px 60px;
+  font-size: 2rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 15px;
+  background: linear-gradient(135deg, var(--neon-magenta), #c050c0);
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 0 30px var(--neon-magenta), 0 0 60px rgba(245,114,247,0.4);
+  transition: transform 0.15s, box-shadow 0.15s;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.start-btn:hover {
+  transform: scale(1.04);
+  box-shadow: 0 0 40px var(--neon-magenta), 0 0 80px rgba(245,114,247,0.5);
+}
+
 /* Full screen absolute canvas for lasers */
 #laser-canvas {
   position: absolute;
@@ -409,7 +760,6 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* Header Level Layout */
 .top-row-header {
   display: flex;
   align-items: center;
@@ -442,7 +792,6 @@ onUnmounted(() => {
   pointer-events: auto;
 }
 
-/* VS Bar Header */
 .vs-bar-container {
   width: 50%;
   max-width: 800px;
@@ -513,7 +862,6 @@ onUnmounted(() => {
   text-shadow: 0 0 5px var(--neon-blue);
 }
 
-/* Main Arena */
 .arena-main {
   flex: 1;
   position: relative;
@@ -522,7 +870,6 @@ onUnmounted(() => {
   align-items: center;
 }
 
-/* Central Deck & Rings */
 #deck-area {
   width: 800px;
   height: 600px;
@@ -563,21 +910,6 @@ onUnmounted(() => {
 @keyframes spinSlow { 100% { transform: rotate(360deg); } }
 @keyframes spinSlowReverse { 100% { transform: rotate(-360deg); } }
 
-.start-btn {
-  position: relative;
-  z-index: 9999;
-  padding: 15px 30px;
-  font-size: 1.5rem;
-  background: var(--neon-magenta);
-  border: none;
-  color: white;
-  cursor: pointer;
-  border-radius: 10px;
-  text-shadow: 0 0 5px white;
-  box-shadow: 0 0 20px var(--neon-magenta);
-}
-
-/* Overlays */
 .overlay {
   display: flex;
   position: absolute;
@@ -603,7 +935,6 @@ onUnmounted(() => {
   color: white; cursor: pointer; border-radius: 10px; box-shadow: 0 0 20px #2ECC71;
 }
 
-/* Distributed Players Node */
 .players-arena {
   position: absolute;
   top: 0;
@@ -666,7 +997,6 @@ onUnmounted(() => {
 .player-name.blue { color: var(--neon-blue); text-shadow: 0 0 5px var(--neon-blue); }
 .player-name.magenta { color: var(--neon-magenta); text-shadow: 0 0 5px var(--neon-magenta); }
 
-/* Settings panel */
 .settings-panel {
   position: fixed;
   bottom: 16px;

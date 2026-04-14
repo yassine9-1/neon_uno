@@ -13,6 +13,19 @@
     <button @click="joinGame">REJOINDRE LA PARTIE</button>
   </div>
 
+  <!-- Waiting Screen (joined during active game) -->
+  <div v-if="screen === 'waiting'" class="screen active waiting-screen">
+    <h1 style="color:#F572F7;text-shadow:0 0 15px #F572F7;margin-bottom:20px;">NEON-UNO</h1>
+    <div class="waiting-icon">⏳</div>
+    <h2 style="color:#72EFF9;text-shadow:0 0 10px #72EFF9;margin:20px 0 10px;">Partie en cours…</h2>
+    <p style="color:#aaa;font-size:1.1rem;max-width:280px;line-height:1.5;text-align:center;">
+      Une partie est déjà en cours.<br/>Vous rejoindrez automatiquement<br/><strong style="color:white;">la prochaine partie</strong> !
+    </p>
+    <div class="waiting-team-badge" :style="{ borderColor: teamColor, boxShadow: '0 0 12px ' + teamColor, color: teamColor }">
+      Équipe : {{ myTeam === 'blue' ? '🟦 BLEUE' : '🟣 ROSE' }}
+    </div>
+  </div>
+
   <!-- Game Over Screen -->
   <div v-if="screen === 'gameover'"
     style="position:fixed;top:0;left:0;width:100%;height:100vh;background:rgba(0,0,0,0.95);z-index:1000;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:20px;box-sizing:border-box;">
@@ -56,14 +69,18 @@
         data-action="draw"
         :class="{ 'playing-out': playingOutId === 'draw' }"
         :style="{ 
-          backgroundColor: '#555', 
-          fontSize: '2rem',
+          backgroundImage: 'url(/assets/cards/backgrounds/card_back.png)',
+          backgroundSize: '100% 100%',
+          backgroundRepeat: 'no-repeat',
+          backgroundColor: '#1a1a2e',
+          border: '3px solid rgba(255, 255, 255, 0.5)',
+          boxShadow: '0 0 15px rgba(255, 255, 255, 0.3), inset 0 0 10px rgba(255, 255, 255, 0.3)',
           transform: playingOutId === 'draw' ? 'none' : (focusedCardId === 'draw' ? 'scale(1.05)' : 'scale(0.9)')
         }"
         @touchstart="onTouchStart"
         @touchend="(e) => onTouchEnd(e, null, 'draw')"
         @click="(e) => selectCard(e, 'draw')"
-      >PIOCHER</div>
+      ></div>
 
       <!-- Hand cards -->
       <div
@@ -71,15 +88,17 @@
         :key="card.id"
         :data-id="card.id"
         class="my-card"
-        :class="{ 'playing-out': playingOutId === card.id }"
-        :style="{
-          backgroundColor: colorMap[card.color],
-          transform: playingOutId === card.id ? 'none' : (focusedCardId === card.id ? 'scale(1.05)' : 'scale(0.9)')
-        }"
+        :class="{ 'playing-out': playingOutId === card.id, 'rainbow-neon': card.color === 'black' }"
+        :style="[
+          getCardBgStyle(card),
+          { transform: playingOutId === card.id ? 'none' : (focusedCardId === card.id ? 'scale(1.05)' : 'scale(0.9)') }
+        ]"
         @touchstart="onTouchStart"
         @touchend="(e) => onTouchEnd(e, card.id, 'play')"
         @click="(e) => selectCard(e, card.id)"
-      >{{ card.value.toUpperCase() }}</div>
+      >
+        <img :src="getCardSymbol(card)" class="card-symbol" />
+      </div>
     </div>
 
     <!-- Attack / Freeze overlays (appended dynamically) -->
@@ -127,12 +146,51 @@ let touchStartY = 0
 const playingOutId = ref(null) // ID of card being animated away
 let observer = null
 
-const colorMap = {
+const baseColorMap = {
+  red: '#2C0B0B',
+  blue: '#0B1A2C',
+  green: '#0B2C14',
+  yellow: '#2C260B',
+  black: '#0B0F19'
+}
+
+const neonColorMap = {
   red: '#E74C3C',
-  blue: '#3498DB',
+  blue: '#72EFF9',
   green: '#2ECC71',
   yellow: '#F1C40F',
-  black: '#333'
+  black: '#F572F7'
+}
+
+function getCardBgStyle(card) {
+  if (!card) return {}
+  const bgName = card.color === 'black' ? 'card_special' : `card_${card.color}`
+  
+  const style = {
+    backgroundImage: `url(/assets/cards/backgrounds/${bgName}.png)`,
+    backgroundSize: '100% 100%',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    backgroundColor: baseColorMap[card.color] || '#1a1a2e'
+  }
+
+  // Only apply static glow if it's NOT a rainbow (black) card
+  if (card.color !== 'black') {
+    const glowColor = neonColorMap[card.color] || '#ffffff'
+    style.border = `3px solid ${glowColor}`
+    style.boxShadow = `0 0 20px ${glowColor}, inset 0 0 20px ${glowColor}`
+  }
+
+  return style
+}
+
+function getCardSymbol(card) {
+  if (!card) return ''
+  if (!isNaN(parseInt(card.value))) {
+    return `/assets/cards/symbols/num_${card.value}.png`
+  } else {
+    return `/assets/cards/symbols/action_${card.value}.png`
+  }
 }
 
 const focusedCardId = ref(null) // ID of card (could be 'draw' or actual ID)
@@ -327,12 +385,28 @@ function confirmBlackCard(color) {
 
 // Socket events
 socket.on('joined_success', (data) => {
-  screen.value = 'game'
   myTeam.value = data.team
-  checkDeviceMotion()
+  if (data.gameInProgress) {
+    screen.value = 'waiting'
+  } else {
+    screen.value = 'game'
+    checkDeviceMotion()
+  }
+})
+
+socket.on('game_in_progress', () => {
+  if (screen.value !== 'game') {
+    screen.value = 'waiting'
+  }
 })
 
 socket.on('your_hand', (hand) => {
+  // Transition from waiting to game when a new round starts
+  if (screen.value === 'waiting') {
+    screen.value = 'game'
+    isFrozen.value = false
+    checkDeviceMotion()
+  }
   currentHand.value = hand
   showUnoBtn.value = hand.length <= 2 && hand.length > 0
   unoBtnColor.value = '#E74C3C'
@@ -386,6 +460,7 @@ socket.on('game_started', () => {
     screen.value = 'game'
     isFrozen.value = false
   }
+  // 'waiting' players will transition via 'your_hand' event
 })
 
 socket.on('attacked', (data) => {
@@ -416,6 +491,7 @@ onUnmounted(() => {
   if (virusInterval) clearInterval(virusInterval)
   window.removeEventListener('devicemotion', handleMotion)
   socket.off('joined_success')
+  socket.off('game_in_progress')
   socket.off('your_hand')
   socket.off('card_played_rejected')
   socket.off('virus_event')
@@ -428,6 +504,26 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+
+.waiting-screen {
+  gap: 0;
+}
+
+.waiting-icon {
+  font-size: 5rem;
+  animation: pulse 1s infinite alternate;
+}
+
+.waiting-team-badge {
+  margin-top: 30px;
+  padding: 12px 30px;
+  border-radius: 30px;
+  border: 2px solid;
+  font-size: 1.3rem;
+  font-weight: bold;
+  background: rgba(255,255,255,0.05);
+}
+
 
 .screen {
   display: none;
