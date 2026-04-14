@@ -13,7 +13,7 @@ Ce document répertorie tous les éléments graphiques nécessaires pour l'inter
 | `card_blue.png` | Fond avec bordure néon bleue |
 | `card_green.png` | Fond avec bordure néon verte |
 | `card_yellow.png` | Fond avec bordure néon jaune |
-| `card_special.png` | Fond pour cartes Wild (流光 / Noir néon) |
+| `card_special.png` | Fond pour cartes Wild (Noir néon) |
 | `card_back.png` | **Dos de la carte** (Logo NEON-UNO) |
 
 ---
@@ -83,7 +83,7 @@ Pour obtenir l'effet néon optimal, utilisez ces codes couleurs lors de la créa
     *   Basé sur une résolution de **300x450px** :
         *   Rayon extérieur (Bordure carte) : **30px**.
         *   Rayon intérieur (si décalage de -15px) : **15px**.
-        *   Rayon contenu (si décalage de -40px) : **0px à 4px** (quasi直角).
+        *   Rayon contenu (si décalage de -40px) : **0px à 4px** (quasi-droit).
 4.  **Effets Visuels** :
     *   Utiliser le mode de fusion "Superposition" (Screen) pour les lueurs.
     *   Ajouter un "Outer Glow" de 10-20px de la couleur du tracé pour simuler le néon.
