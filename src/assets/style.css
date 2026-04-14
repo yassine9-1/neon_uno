@@ -251,3 +251,9 @@ main {
         opacity: 0;
     }
 }
+.card-symbol {
+    width: 60%;
+    height: auto;
+    pointer-events: none;
+    user-select: none;
+}

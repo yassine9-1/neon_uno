@@ -255,6 +255,31 @@ function getCardSymbol(card) {
   }
 }
 
+function getCardBgStyle(card) {
+  if (!card) return {}
+  const bgName = card.color === 'black' ? 'card_special' : `card_${card.color}`
+  const glowColor = card.color === 'black' ? '#F572F7' : colorMap[card.color]
+  
+  return {
+    backgroundImage: `url(/assets/cards/backgrounds/${bgName}.png)`,
+    backgroundSize: '100% 100%',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    backgroundColor: 'transparent',
+    border: `3px solid ${glowColor}`,
+    boxShadow: `0 0 20px ${glowColor}, inset 0 0 20px ${glowColor}`
+  }
+}
+
+function getCardSymbol(card) {
+  if (!card) return ''
+  if (!isNaN(parseInt(card.value))) {
+    return `/assets/cards/symbols/num_${card.value}.png`
+  } else {
+    return `/assets/cards/symbols/action_${card.value}.png`
+  }
+}
+
 fetch('/api/server-info')
   .then(res => res.json())
   .then(data => {

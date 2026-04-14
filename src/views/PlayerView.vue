@@ -69,14 +69,18 @@
         data-action="draw"
         :class="{ 'playing-out': playingOutId === 'draw' }"
         :style="{ 
-          backgroundColor: '#555', 
-          fontSize: '2rem',
+          backgroundImage: 'url(/assets/cards/backgrounds/card_back.png)',
+          backgroundSize: '100% 100%',
+          backgroundRepeat: 'no-repeat',
+          backgroundColor: 'transparent',
+          border: '3px solid rgba(255, 255, 255, 0.5)',
+          boxShadow: '0 0 15px rgba(255, 255, 255, 0.3), inset 0 0 10px rgba(255, 255, 255, 0.3)',
           transform: playingOutId === 'draw' ? 'none' : (focusedCardId === 'draw' ? 'scale(1.05)' : 'scale(0.9)')
         }"
         @touchstart="onTouchStart"
         @touchend="(e) => onTouchEnd(e, null, 'draw')"
         @click="(e) => selectCard(e, 'draw')"
-      >PIOCHER</div>
+      ></div>
 
       <!-- Hand cards -->
       <div
@@ -85,14 +89,16 @@
         :data-id="card.id"
         class="my-card"
         :class="{ 'playing-out': playingOutId === card.id }"
-        :style="{
-          backgroundColor: colorMap[card.color],
-          transform: playingOutId === card.id ? 'none' : (focusedCardId === card.id ? 'scale(1.05)' : 'scale(0.9)')
-        }"
+        :style="[
+          getCardBgStyle(card),
+          { transform: playingOutId === card.id ? 'none' : (focusedCardId === card.id ? 'scale(1.05)' : 'scale(0.9)') }
+        ]"
         @touchstart="onTouchStart"
         @touchend="(e) => onTouchEnd(e, card.id, 'play')"
         @click="(e) => selectCard(e, card.id)"
-      >{{ card.value.toUpperCase() }}</div>
+      >
+        <img :src="getCardSymbol(card)" class="card-symbol" />
+      </div>
     </div>
 
     <!-- Attack / Freeze overlays (appended dynamically) -->
@@ -146,6 +152,31 @@ const colorMap = {
   green: '#2ECC71',
   yellow: '#F1C40F',
   black: '#333'
+}
+
+function getCardBgStyle(card) {
+  if (!card) return {}
+  const bgName = card.color === 'black' ? 'card_special' : `card_${card.color}`
+  const glowColor = card.color === 'black' ? '#F572F7' : colorMap[card.color]
+  
+  return {
+    backgroundImage: `url(/assets/cards/backgrounds/${bgName}.png)`,
+    backgroundSize: '100% 100%',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    backgroundColor: 'transparent',
+    border: `3px solid ${glowColor}`,
+    boxShadow: `0 0 20px ${glowColor}, inset 0 0 20px ${glowColor}`
+  }
+}
+
+function getCardSymbol(card) {
+  if (!card) return ''
+  if (!isNaN(parseInt(card.value))) {
+    return `/assets/cards/symbols/num_${card.value}.png`
+  } else {
+    return `/assets/cards/symbols/action_${card.value}.png`
+  }
 }
 
 const focusedCardId = ref(null) // ID of card (could be 'draw' or actual ID)
