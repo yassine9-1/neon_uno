@@ -88,7 +88,7 @@
         :key="card.id"
         :data-id="card.id"
         class="my-card"
-        :class="{ 'playing-out': playingOutId === card.id }"
+        :class="{ 'playing-out': playingOutId === card.id, 'rainbow-neon': card.color === 'black' }"
         :style="[
           getCardBgStyle(card),
           { transform: playingOutId === card.id ? 'none' : (focusedCardId === card.id ? 'scale(1.05)' : 'scale(0.9)') }
@@ -145,17 +145,23 @@ const colorMap = {
 function getCardBgStyle(card) {
   if (!card) return {}
   const bgName = card.color === 'black' ? 'card_special' : `card_${card.color}`
-  const glowColor = card.color === 'black' ? '#F572F7' : colorMap[card.color]
   
-  return {
+  const style = {
     backgroundImage: `url(/assets/cards/backgrounds/${bgName}.png)`,
     backgroundSize: '100% 100%',
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',
-    backgroundColor: 'transparent',
-    border: `3px solid ${glowColor}`,
-    boxShadow: `0 0 20px ${glowColor}, inset 0 0 20px ${glowColor}`
+    backgroundColor: 'transparent'
   }
+
+  // Only apply static glow if it's NOT a rainbow (black) card
+  if (card.color !== 'black') {
+    const glowColor = colorMap[card.color]
+    style.border = `3px solid ${glowColor}`
+    style.boxShadow = `0 0 20px ${glowColor}, inset 0 0 20px ${glowColor}`
+  }
+
+  return style
 }
 
 function getCardSymbol(card) {

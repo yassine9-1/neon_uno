@@ -160,7 +160,7 @@ main {
     }
 }
 
-/* Animations visuelles pour l'étape 6 */
+/* Visual animations */
 
 .particle {
     position: absolute;
@@ -257,3 +257,60 @@ main {
     pointer-events: none;
     user-select: none;
 }
+
+/* Rainbow flowing rotation animation */
+@keyframes rotate-gradient {
+    from { transform: translate(-50%, -50%) rotate(0deg); }
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.rainbow-neon {
+    position: relative;
+    z-index: 1;
+    border: none !important;
+    background-color: #0b0f19 !important;
+    box-shadow: none !important;
+    overflow: hidden;
+}
+
+/* Rotating rainbow background layer */
+.rainbow-neon::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 250%; 
+    height: 250%;
+    transform: translate(-50%, -50%);
+    background: conic-gradient(
+        #ff0000, #ff8800, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000
+    );
+    animation: rotate-gradient 3s linear infinite;
+    z-index: -1;
+}
+
+/* Inner mask to create border effect */
+.rainbow-neon::after {
+    content: '';
+    position: absolute;
+    inset: 4px; /* Border width */
+    background: inherit;
+    border-radius: 12px; /* Slightly smaller than parent 15px */
+    z-index: -1;
+}
+
+/* Enhanced outer glow layer */
+.rainbow-glow-layer {
+    position: relative;
+}
+
+.rainbow-glow-layer::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: -1;
+    background: inherit;
+    filter: blur(25px);
+    opacity: 0.6;
+}
+
