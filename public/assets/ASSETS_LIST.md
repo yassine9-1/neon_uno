@@ -42,7 +42,24 @@ Ce document répertorie tous les éléments graphiques nécessaires pour l'inter
 *   `team_blue_icon.png` : Icône de l'équipe Néon Bleu.
 *   `team_magenta_icon.png` : Icône de l'équipe Néon Rose (Magenta).
 
-## 4. Charte Graphique (Neon Palette)
+---
+
+## 4. Améliorations Visuelles (Visual Polish)
+*Dossier : `/public/assets/ui/fx/`*
+
+| Nom du fichier | Description |
+| :--- | :--- |
+| `freeze_overlay.png` | Overlay plein écran "Givre/Statique" (quand l'équipe est gelée) |
+| `attack_warning.png` | Flash rouge ou avertissement "+2/+4" (quand on reçoit des cartes) |
+| `uno_button.png` | Bouton interactif stylisé pour crier "UNO !" |
+| `draw_button.png` | Icône/Bouton pour piocher une carte |
+| `gauge_frame.png` | Cadre décoratif/verre pour la barre d'énergie (Projecteur) |
+| `cure_success.png` | Feedback visuel de réussite de scan/shake (Virus soigné) |
+| `victory_banner.png` | Bannière de victoire à afficher en fin de partie |
+
+---
+
+## 5. Charte Graphique (Neon Palette)
 
 Pour obtenir l'effet néon optimal, utilisez ces codes couleurs lors de la création de vos ressources :
 
