@@ -42,11 +42,32 @@ Ce document répertorie tous les éléments graphiques nécessaires pour l'inter
 *   `team_blue_icon.png` : Icône de l'équipe Néon Bleu.
 *   `team_magenta_icon.png` : Icône de l'équipe Néon Rose (Magenta).
 
+## 4. Charte Graphique (Neon Palette)
+
+Pour obtenir l'effet néon optimal, utilisez ces codes couleurs lors de la création de vos ressources :
+
+| Type de Carte | Fond (Dark Base) | Tracé Néon (Stroke) | Éclat/Accent (Inner Fine) |
+| :--- | :--- | :--- | :--- |
+| **Rouge** | `#2C0B0B` | `#E74C3C` | `#FF5E5E` |
+| **Bleu** | `#0B1A2C` | `#72EFF9` | `#FFFFFF` |
+| **Vert** | `#0B2C14` | `#2ECC71` | `#A2FFC8` |
+| **Jaune** | `#2C260B` | `#F1C40F` | `#FFFD91` |
+| **Noir (Wild)** | `#0B0F19` | `#F572F7` | `#FFFFFF` |
+
 ---
 
 ## Spécifications Techniques
-1.  **Transparence** : Les symboles (`symbols/`) doivent avoir un fond transparent.
-2.  **Style** : Privilégier des effets "Outer Glow" (Lueur externe) pour renforcer le côté néon.
-3.  **Résolution** : 
-    *   Cartes : ~300x450px
-    *   Symboles : ~256x256px (Carré)
+
+1.  **Format** : PNG-24 avec couche Alpha (transparence) ou SVG.
+2.  **Résolution** : 
+    *   Cartes : **300 x 450 px** (Ratio exact 2:3).
+    *   Symboles : ~256 x 256 px (Carré).
+3.  **Gestion des Arrondis (Border Radius)** :
+    *   Basé sur une résolution de **300x450px** :
+        *   Rayon extérieur (Bordure carte) : **30px**.
+        *   Rayon intérieur (si décalage de -15px) : **15px**.
+        *   Rayon contenu (si décalage de -40px) : **0px à 4px** (quasi直角).
+4.  **Effets Visuels** :
+    *   Utiliser le mode de fusion "Superposition" (Screen) pour les lueurs.
+    *   Ajouter un "Outer Glow" de 10-20px de la couleur du tracé pour simuler le néon.
+5.  **Contraste** : Le fond des cartes doit rester très sombre (`#0B0F19` ou variante foncée) pour que les symboles néons "pop" visuellement.
