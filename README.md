@@ -3,21 +3,15 @@
 # ⚡ NEON-UNO ⚡
 
 <p>
-  <img src="https://img.shields.io/badge/Node.js-18%2B-339933?style=for-the-badge&logo=node.js&logoColor=white" alt="Node.js"/>
-  <img src="https://img.shields.io/badge/Vue.js-3-4FC08D?style=for-the-badge&logo=vue.js&logoColor=white" alt="Vue.js"/>
-  <img src="https://img.shields.io/badge/Socket.io-Realtime-010101?style=for-the-badge&logo=socket.io&logoColor=white" alt="Socket.io"/>
-  <img src="https://img.shields.io/badge/HTTPS-SSL-FF6B6B?style=for-the-badge&logo=letsencrypt&logoColor=white" alt="HTTPS"/>
+  <img src="https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white" alt="Node.js"/>
+  <img src="https://img.shields.io/badge/Vue.js-3-4FC08D?logo=vue.js&logoColor=white" alt="Vue.js"/>
+  <img src="https://img.shields.io/badge/Socket.io-Realtime-010101?logo=socket.io&logoColor=white" alt="Socket.io"/>
+  <img src="https://img.shields.io/badge/HTTPS-SSL-FF6B6B?logo=letsencrypt&logoColor=white" alt="HTTPS"/>
 </p>
 
-<p>
-  <a href="README.md"><img src="https://img.shields.io/badge/🇫🇷-Français-blue?style=flat-square" alt="Français"/></a>
-  &nbsp;
-  <a href="README.en.md"><img src="https://img.shields.io/badge/🇬🇧-English-blue?style=flat-square" alt="English"/></a>
-  &nbsp;
-  <a href="README.zh.md"><img src="https://img.shields.io/badge/🇨🇳-中文-red?style=flat-square" alt="中文"/></a>
-</p>
+| Français | [English](./README.en.md) | [中文](./README.zh.md) |
 
-*Un jeu de cartes multijoueur massif et colocalisé — smartphones comme manettes, vidéoprojecteur comme arène.*
+_Un jeu de cartes multijoueur massif et colocalisé — smartphones comme manettes, vidéoprojecteur comme arène._
 
 </div>
 
@@ -31,14 +25,14 @@
 
 ## ✨ Fonctionnalités Principales
 
-| Fonctionnalité | Description |
-|---|---|
-| 🖥️ **Écran Géant** | Affiche l'arène de jeu, la carte en cours, la répartition des joueurs, la jauge de score et des animations spectaculaires (lasers, explosions, particules). |
-| 📱 **Manettes Smartphone** | Les joueurs rejoignent la partie en scannant simplement le QR Code affiché à l'écran. |
-| 🤝 **Deux Équipes** | Attribution aléatoire des équipes. Les points remplissent une jauge commune par équipe. |
-| 🦠 **Événement Virus** | Un virus aléatoire gèle le jeu : secouez votre téléphone pour vous soigner, ou recevez des pénalités ! |
-| 🃏 **Cartes Spéciales** | Les effets ciblent toujours l'équipe adverse (+2/+4 adversaire aléatoire, gel d'équipe). |
-| 📳 **Retours Haptiques** | L'accéléromètre et les vibrations rendent le jeu encore plus immersif. |
+| Fonctionnalité             | Description                                                                                                                                                 |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🖥️ **Écran Géant**         | Affiche l'arène de jeu, la carte en cours, la répartition des joueurs, la jauge de score et des animations spectaculaires (lasers, explosions, particules). |
+| 📱 **Manettes Smartphone** | Les joueurs rejoignent la partie en scannant simplement le QR Code affiché à l'écran.                                                                       |
+| 🤝 **Deux Équipes**        | Attribution aléatoire des équipes. Les points remplissent une jauge commune par équipe.                                                                     |
+| 🦠 **Événement Virus**     | Un virus aléatoire gèle le jeu : secouez votre téléphone pour vous soigner, ou recevez des pénalités !                                                      |
+| 🃏 **Cartes Spéciales**    | Les effets ciblent toujours l'équipe adverse (+2/+4 adversaire aléatoire, gel d'équipe).                                                                    |
+| 📳 **Retours Haptiques**   | L'accéléromètre et les vibrations rendent le jeu encore plus immersif.                                                                                      |
 
 ---
 
@@ -50,10 +44,10 @@
 
 Le jeu utilise un paquet de **108 cartes** :
 
-| Couleur | Cartes |
-|---|---|
+| Couleur                              | Cartes                                                                                                     |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
 | 🔴 Rouge, 🔵 Bleu, 🟢 Vert, 🟡 Jaune | `0` (×1), `1`–`9` (×2 chacun), `+2` (×2), `Passer` (×2), `Inversion` (×2) — soit **25 cartes par couleur** |
-| ⚫ Noir | `Joker` (×4), `Joker +4` (×4) |
+| ⚫ Noir                              | `Joker` (×4), `Joker +4` (×4)                                                                              |
 
 ### 🚀 Mise en Place
 
@@ -68,6 +62,7 @@ Le jeu utilise un paquet de **108 cartes** :
 > **Il n'y a pas d'ordre de jeu !** Tout le monde joue simultanément. Le premier joueur à poser une carte valide l'emporte.
 
 Pour poser une carte, elle doit respecter **au moins une** de ces conditions :
+
 - ✅ Même **couleur** que la carte active
 - ✅ Même **valeur** (ou type d'action) que la carte active
 - ✅ Être une carte **noire** (Joker ou Joker +4) — toujours jouable
@@ -85,13 +80,13 @@ La **première équipe à atteindre 100 points** remporte la partie. Si un joueu
 
 ### 🔮 Effets des Cartes Spéciales
 
-| Carte | Effet |
-|---|---|
-| **`+2` (Draw 2)** | Un adversaire **aléatoire** de l'équipe opposée pioche **2 cartes**. |
-| **`Joker` (Wild)** | Le joueur choisit la prochaine couleur active. |
+| Carte                        | Effet                                                                            |
+| ---------------------------- | -------------------------------------------------------------------------------- |
+| **`+2` (Draw 2)**            | Un adversaire **aléatoire** de l'équipe opposée pioche **2 cartes**.             |
+| **`Joker` (Wild)**           | Le joueur choisit la prochaine couleur active.                                   |
 | **`Joker +4` (Wild Draw 4)** | Le joueur choisit la couleur **ET** un adversaire aléatoire pioche **4 cartes**. |
-| **`Passer` (Skip)** | Toute l'équipe adverse est **gelée** temporairement (quelques secondes). |
-| **`Inversion` (Reverse)** | Toute l'équipe adverse est **gelée** temporairement (même effet que Passer). |
+| **`Passer` (Skip)**          | Toute l'équipe adverse est **gelée** temporairement (quelques secondes).         |
+| **`Inversion` (Reverse)**    | Toute l'équipe adverse est **gelée** temporairement (même effet que Passer).     |
 
 > 💡 Les cartes Joker jouées deviennent la couleur choisie par le joueur pour la suite de la partie.
 
@@ -136,7 +131,7 @@ Lorsque la pioche tombe en dessous de **10 cartes**, un nouveau paquet complet d
    ```bash
    node gen-cert.js
    ```
-   *Cela crée les fichiers `cert.pem` et `key.pem` à la racine du projet.*
+   _Cela crée les fichiers `cert.pem` et `key.pem` à la racine du projet._
 
 ---
 
@@ -170,13 +165,13 @@ Le jeu est accessible sur **`https://localhost:3000`**. L'IP réseau locale est 
 
 ## 🏗️ Technologies Utilisées
 
-| Couche | Technologie |
-|---|---|
-| **Frontend** | Vue.js 3, Vite, Vue Router |
-| **Backend** | Node.js, Express.js |
-| **Temps Réel** | Socket.io |
-| **Matériel** | DeviceMotion API, Vibration API |
-| **Outils** | `qrcode`, `node-forge` |
+| Couche         | Technologie                     |
+| -------------- | ------------------------------- |
+| **Frontend**   | Vue.js 3, Vite, Vue Router      |
+| **Backend**    | Node.js, Express.js             |
+| **Temps Réel** | Socket.io                       |
+| **Matériel**   | DeviceMotion API, Vibration API |
+| **Outils**     | `qrcode`, `node-forge`          |
 
 ---
 

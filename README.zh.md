@@ -3,21 +3,15 @@
 # ⚡ NEON-UNO ⚡
 
 <p>
-  <img src="https://img.shields.io/badge/Node.js-18%2B-339933?style=for-the-badge&logo=node.js&logoColor=white" alt="Node.js"/>
-  <img src="https://img.shields.io/badge/Vue.js-3-4FC08D?style=for-the-badge&logo=vue.js&logoColor=white" alt="Vue.js"/>
-  <img src="https://img.shields.io/badge/Socket.io-实时-010101?style=for-the-badge&logo=socket.io&logoColor=white" alt="Socket.io"/>
-  <img src="https://img.shields.io/badge/HTTPS-SSL-FF6B6B?style=for-the-badge&logo=letsencrypt&logoColor=white" alt="HTTPS"/>
+  <img src="https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white" alt="Node.js"/>
+  <img src="https://img.shields.io/badge/Vue.js-3-4FC08D?logo=vue.js&logoColor=white" alt="Vue.js"/>
+  <img src="https://img.shields.io/badge/Socket.io-Realtime-010101?logo=socket.io&logoColor=white" alt="Socket.io"/>
+  <img src="https://img.shields.io/badge/HTTPS-SSL-FF6B6B?logo=letsencrypt&logoColor=white" alt="HTTPS"/>
 </p>
 
-<p>
-  <a href="README.md"><img src="https://img.shields.io/badge/🇫🇷-Français-blue?style=flat-square" alt="Français"/></a>
-  &nbsp;
-  <a href="README.en.md"><img src="https://img.shields.io/badge/🇬🇧-English-blue?style=flat-square" alt="English"/></a>
-  &nbsp;
-  <a href="README.zh.md"><img src="https://img.shields.io/badge/🇨🇳-中文-red?style=flat-square" alt="中文"/></a>
-</p>
+| [Français](./README.md) | [English](./README.en.md) | 中文 |
 
-*一款大规模同场多人卡牌游戏 —— 用智能手机当手柄，投影仪作为游戏竞技场。*
+_一款大规模同场多人卡牌游戏 —— 用智能手机当手柄，投影仪作为游戏竞技场。_
 
 </div>
 
@@ -31,14 +25,14 @@
 
 ## ✨ 主要功能
 
-| 功能 | 说明 |
-|---|---|
-| 🖥️ **大屏幕** | 展示游戏竞技场、当前牌、玩家分布、积分条以及炫酷的视觉特效（激光、爆炸、粒子动画）。 |
-| 📱 **手机手柄** | 玩家只需扫描屏幕上显示的二维码即可加入游戏。 |
-| 🤝 **双队对抗** | 队伍随机分配，得分填充各队的共同积分条。 |
-| 🦠 **病毒事件** | 随机病毒事件冻结游戏：摇晃手机治愈自己，否则将受到惩罚！ |
-| 🃏 **特殊牌效果** | 效果始终针对对方队伍（+2/+4 随机对手摸牌，冻结全队）。 |
-| 📳 **触觉反馈** | 加速度计和振动让体验更加身临其境。 |
+| 功能              | 说明                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------ |
+| 🖥️ **大屏幕**     | 展示游戏竞技场、当前牌、玩家分布、积分条以及炫酷的视觉特效（激光、爆炸、粒子动画）。 |
+| 📱 **手机手柄**   | 玩家只需扫描屏幕上显示的二维码即可加入游戏。                                         |
+| 🤝 **双队对抗**   | 队伍随机分配，得分填充各队的共同积分条。                                             |
+| 🦠 **病毒事件**   | 随机病毒事件冻结游戏：摇晃手机治愈自己，否则将受到惩罚！                             |
+| 🃏 **特殊牌效果** | 效果始终针对对方队伍（+2/+4 随机对手摸牌，冻结全队）。                               |
+| 📳 **触觉反馈**   | 加速度计和振动让体验更加身临其境。                                                   |
 
 ---
 
@@ -50,10 +44,10 @@
 
 游戏使用共 **108 张牌**的牌组：
 
-| 颜色 | 牌张 |
-|---|---|
+| 颜色                       | 牌张                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------ |
 | 🔴 红、🔵 蓝、🟢 绿、🟡 黄 | `0`（×1）、`1`–`9`（各 ×2）、`+2`（×2）、`跳过`（×2）、`反转`（×2）—— 每色 **25 张** |
-| ⚫ 黑色 | `百搭`（×4）、`百搭 +4`（×4） |
+| ⚫ 黑色                    | `百搭`（×4）、`百搭 +4`（×4）                                                        |
 
 ### 🚀 游戏准备
 
@@ -68,6 +62,7 @@
 > **没有出牌顺序！** 所有人同时出牌，第一个打出有效牌的玩家赢得本轮。
 
 出牌必须满足以下**至少一个**条件：
+
 - ✅ 与当前活跃牌**颜色相同**
 - ✅ 与当前活跃牌**数值（或动作类型）相同**
 - ✅ 是**黑色牌**（百搭或百搭 +4）—— 随时可出
@@ -85,13 +80,13 @@
 
 ### 🔮 特殊牌效果
 
-| 牌型 | 效果 |
-|---|---|
-| **`+2`（Draw 2）** | 对方队伍中**随机一名对手**摸 **2 张牌**。 |
-| **`百搭`（Wild）** | 出牌玩家选择下一张活跃牌的颜色。 |
+| 牌型                         | 效果                                                  |
+| ---------------------------- | ----------------------------------------------------- |
+| **`+2`（Draw 2）**           | 对方队伍中**随机一名对手**摸 **2 张牌**。             |
+| **`百搭`（Wild）**           | 出牌玩家选择下一张活跃牌的颜色。                      |
 | **`百搭 +4`（Wild Draw 4）** | 玩家选择颜色，**同时**对方随机一名对手摸 **4 张牌**。 |
-| **`跳过`（Skip）** | 对方**整支队伍**被**暂时冻结**（持续数秒）。 |
-| **`反转`（Reverse）** | 对方**整支队伍**被**暂时冻结**（效果同跳过）。 |
+| **`跳过`（Skip）**           | 对方**整支队伍**被**暂时冻结**（持续数秒）。          |
+| **`反转`（Reverse）**        | 对方**整支队伍**被**暂时冻结**（效果同跳过）。        |
 
 > 💡 打出百搭牌后，玩家选择的颜色将成为本轮后续的活跃颜色。
 
@@ -136,7 +131,7 @@
    ```bash
    node gen-cert.js
    ```
-   *此步骤会在项目根目录生成 `cert.pem` 和 `key.pem` 文件。*
+   _此步骤会在项目根目录生成 `cert.pem` 和 `key.pem` 文件。_
 
 ---
 
@@ -170,13 +165,13 @@ npm start
 
 ## 🏗️ 技术栈
 
-| 层次 | 技术 |
-|---|---|
-| **前端** | Vue.js 3, Vite, Vue Router |
-| **后端** | Node.js, Express.js |
-| **实时通信** | Socket.io |
+| 层次         | 技术                            |
+| ------------ | ------------------------------- |
+| **前端**     | Vue.js 3, Vite, Vue Router      |
+| **后端**     | Node.js, Express.js             |
+| **实时通信** | Socket.io                       |
 | **硬件接口** | DeviceMotion API, Vibration API |
-| **工具库** | `qrcode`, `node-forge` |
+| **工具库**   | `qrcode`, `node-forge`          |
 
 ---
 
