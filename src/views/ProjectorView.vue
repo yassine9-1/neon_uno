@@ -255,37 +255,6 @@ function getCardSymbol(card) {
   }
 }
 
-function getCardBgStyle(card) {
-  if (!card) return {}
-  const bgName = card.color === 'black' ? 'card_special' : `card_${card.color}`
-  
-  const style = {
-    backgroundImage: `url(/assets/cards/backgrounds/${bgName}.png)`,
-    backgroundSize: '100% 100%',
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat',
-    backgroundColor: 'transparent'
-  }
-
-  // Only apply static glow if it's NOT a rainbow (black) card
-  if (card.color !== 'black') {
-    const glowColor = colorMap[card.color]
-    style.border = `3px solid ${glowColor}`
-    style.boxShadow = `0 0 20px ${glowColor}, inset 0 0 20px ${glowColor}`
-  }
-
-  return style
-}
-
-function getCardSymbol(card) {
-  if (!card) return ''
-  if (!isNaN(parseInt(card.value))) {
-    return `/assets/cards/symbols/num_${card.value}.png`
-  } else {
-    return `/assets/cards/symbols/action_${card.value}.png`
-  }
-}
-
 fetch('/api/server-info')
   .then(res => res.json())
   .then(data => {

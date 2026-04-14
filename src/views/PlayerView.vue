@@ -72,7 +72,7 @@
           backgroundImage: 'url(/assets/cards/backgrounds/card_back.png)',
           backgroundSize: '100% 100%',
           backgroundRepeat: 'no-repeat',
-          backgroundColor: 'transparent',
+          backgroundColor: '#1a1a2e',
           border: '3px solid rgba(255, 255, 255, 0.5)',
           boxShadow: '0 0 15px rgba(255, 255, 255, 0.3), inset 0 0 10px rgba(255, 255, 255, 0.3)',
           transform: playingOutId === 'draw' ? 'none' : (focusedCardId === 'draw' ? 'scale(1.05)' : 'scale(0.9)')
@@ -146,12 +146,20 @@ let touchStartY = 0
 const playingOutId = ref(null) // ID of card being animated away
 let observer = null
 
-const colorMap = {
+const baseColorMap = {
+  red: '#2C0B0B',
+  blue: '#0B1A2C',
+  green: '#0B2C14',
+  yellow: '#2C260B',
+  black: '#0B0F19'
+}
+
+const neonColorMap = {
   red: '#E74C3C',
-  blue: '#3498DB',
+  blue: '#72EFF9',
   green: '#2ECC71',
   yellow: '#F1C40F',
-  black: '#333'
+  black: '#F572F7'
 }
 
 function getCardBgStyle(card) {
@@ -163,12 +171,12 @@ function getCardBgStyle(card) {
     backgroundSize: '100% 100%',
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',
-    backgroundColor: 'transparent'
+    backgroundColor: baseColorMap[card.color] || '#1a1a2e'
   }
 
   // Only apply static glow if it's NOT a rainbow (black) card
   if (card.color !== 'black') {
-    const glowColor = colorMap[card.color]
+    const glowColor = neonColorMap[card.color] || '#ffffff'
     style.border = `3px solid ${glowColor}`
     style.boxShadow = `0 0 20px ${glowColor}, inset 0 0 20px ${glowColor}`
   }
