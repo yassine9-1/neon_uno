@@ -132,7 +132,9 @@
           :key="entry.id"
           class="card pile-card"
           :style="getPileCardStyle(index, entry)"
-        >{{ entry.card.value.toUpperCase() }}</div>
+        >
+          <img :src="getCardSymbol(entry.card)" class="card-symbol" />
+        </div>
       </div>
 
       <!-- Distributed Players -->
@@ -212,6 +214,31 @@ const colorMap = {
   green: '#2ECC71',
   yellow: '#F1C40F',
   black: '#333'
+}
+
+function getCardBgStyle(card) {
+  if (!card) return {}
+  const bgName = card.color === 'black' ? 'card_special' : `card_${card.color}`
+  const glowColor = card.color === 'black' ? '#F572F7' : colorMap[card.color]
+  
+  return {
+    backgroundImage: `url(/assets/cards/backgrounds/${bgName}.png)`,
+    backgroundSize: '100% 100%',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    backgroundColor: 'transparent',
+    border: `3px solid ${glowColor}`,
+    boxShadow: `0 0 20px ${glowColor}, inset 0 0 20px ${glowColor}`
+  }
+}
+
+function getCardSymbol(card) {
+  if (!card) return ''
+  if (!isNaN(parseInt(card.value))) {
+    return `/assets/cards/symbols/num_${card.value}.png`
+  } else {
+    return `/assets/cards/symbols/action_${card.value}.png`
+  }
 }
 
 fetch('/api/server-info')
@@ -332,15 +359,15 @@ function getPileCardStyle(index, entry) {
     scale = Math.max(0.75, 1 - index * 0.008)
   }
 
+  const bgStyle = getCardBgStyle(entry.card)
+
   return {
     position: 'absolute',
     left: '50%',
     top: '50%',
     transform: `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) rotate(${rotation}deg) scale(${scale})`,
     zIndex: n + 1 - index,
-    backgroundColor: colorMap[entry.card.color],
-    borderColor: 'white',
-    boxShadow: `0 0 20px ${colorMap[entry.card.color]}`,
+    ...bgStyle,
     opacity,
     transition: index === 0 ? 'none' : 'transform 0.55s ease-out, opacity 0.55s ease-out',
   }
