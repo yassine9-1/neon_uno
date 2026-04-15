@@ -576,8 +576,10 @@ io.on('connection', (socket) => {
         }
 
         const aiId = `ai_${++aiIdCounter}_${Date.now()}`;
-        const aiName = `${generateAIName()} [AI]`;
         const personality = AI_PERSONALITIES[Math.floor(Math.random() * AI_PERSONALITIES.length)];
+        
+        const suffixMap = { fast: '[noob AI]', medium: '[casual AI]', slow: '[pro AI]' };
+        const aiName = `${generateAIName()} ${suffixMap[personality]}`;
 
         // Balance teams
         const bluePlayers = Object.values(gameState.players).filter(p => p.team === 'blue').length;
