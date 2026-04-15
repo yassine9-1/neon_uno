@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ NEON-UNO ⚡
+# NEON-UNO
 
 <p>
   <img src="https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white" alt="Node.js"/>
@@ -27,14 +27,14 @@ _A massive co-located multiplayer card game — smartphones as controllers, proj
 
 | Feature                       | Description                                                                                                                             |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| 🖥️ **Big Screen**             | Displays the game arena, current card, player distribution, score gauge and spectacular visual effects (lasers, explosions, particles). |
-| 📱 **Smartphone Controllers** | Join by scanning QR code. Automatic card sorting by color. Adaptive UI.                |
-| 🤝 **Two Teams**              | Assigned randomly. Points use complex real-time weights to fill shared gauges.         |
-| 📡 **State Persistence**      | Supports reconnection and page refreshes: player state (hand, scores) is preserved.    |
-| 🦠 **Virus Event**            | A random virus freezes the game: shake your phone to cure yourself, or receive penalties!|
-| 🃏 **Special Cards**          | Effects always target the opposing team (+2/+4 random opponent, team freeze).          |
-| 📳 **Haptic Feedback**        | Accelerometer and vibrations make the experience even more immersive.                  |
-| 📈 **Score Popups**           | Real-time score gain displays at player positions on the projector screen.             |
+| **Big Screen**             | Displays the game arena, current card, player distribution, score gauge and spectacular visual effects. |
+| **Smartphone Controllers** | Join by scanning QR code. Automatic card sorting by color. Adaptive UI.                |
+| **Two Teams**              | Assigned randomly. Points use complex real-time weights to fill shared gauges.         |
+| **State Persistence**      | Supports reconnection and page refreshes: player state (hand, scores) is preserved.    |
+| **Virus Event**            | A random virus freezes the game: shake your phone to cure yourself, or receive penalties!|
+| **Special Cards**          | Effects always target the opposing team (+2/+4 random opponent, team freeze).          |
+| **Haptics & Feedback**     | Accelerometer, vibrations, and score popups make the experience immersive.              |
+| **Emoji Reactions**       | Send emojis during and after the game (with global celebratory animations).        |
 
 ---
 
@@ -75,7 +75,9 @@ If no card is suitable, the player can **shake their phone** to draw a card from
 
 NEON-UNO uses a dynamic weighted scoring system. Each successfully played card rewards a **float score** based on multiple factors:
 
-**`Final Score = Base (Human 2 / AI 1) × Layer 1 (Hand Count) × Layer 2 (Variety) × Layer 3 (Streak)`**
+**`Final Score = Base (Human 2.0 / AI by tier) × Layer 1 (Hand Count) × Layer 2 (Variety) × Layer 3 (Streak)`**
+
+> **Unified Logic**: Both AI and human players now share the same card processing engine (`processPlayCard`), ensuring absolute parity in scoring, rules, and special effects.
 
 #### 1. Layer 1: Hand Count Multiplier
 The fewer cards you hold, the higher the score (rewarding high-risk play).
@@ -137,13 +139,21 @@ When the draw pile drops below **10 cards**, a brand new shuffled deck of 108 ca
 
 ## 🤖 AI Players
 
-The host can add up to **5 AI players** from the lobby screen (via the "🤖 Add AI" button at the bottom). Each AI gets a random name followed by `[AI]` and is randomly assigned one of three personality types. **AI players contribute +1/−1 point per card played** (compared to +2/−2 for human players).
+The host can add up to **5 AI players** from the lobby screen (via the "🤖 Add AI" button). The AI has been overhauled with balanced scoring and tiered logic.
 
-| Personality | Speed | Interval | Algorithm | Behaviour |
+#### 🧠 AI Tiers
+
+| Personality | Base Score | Speed Profile | Algorithm | Characteristics |
 |---|---|---|---|---|
-| **⚡ Fast** | Very fast | 1 s max | **Naive** — plays the first valid card found in hand, with no strategy at all. | Forgets to call UNO sometimes (50% chance). Rarely cures from virus (40%). |
-| **⚖️ Medium** | Moderate | 1.5 s max | **Tactical** — prioritises action cards (Skip, Reverse, +2) of matching colour, then same-colour cards, then same-value cards, and saves Wild cards as a last resort. | Reliably calls UNO. Often cures from virus (70%). |
-| **🧠 Smart** (_slow_) | Slow | 2.5 s max | **Intelligent** — prioritises +2 of matching colour to attack, then Skip/Reverse to freeze opponents, then plays its dominant colour (the colour it holds most of) to control the game, and reserves Wild Draw 4 and Wild cards for last. | Always calls UNO. Almost always cures from virus (95%). |
+| **⚡ Noob** | **0.7** | Very fast | **Randomized** | Prioritizes playing cards of the **same color** as the pile. This high frequency is balanced by the heavy Streak penalties it incurs. |
+| **⚖️ Casual** | **1.0** | Moderate | **Heuristic Tactical** | Weights actions > color > value. A balanced opponent for casual play. |
+| **🧠 Pro** (_slow_) | **1.3** | Deliberate | **2-Step Lookahead** | Simulates future states to maximize "points per second". Uses a pessimistic drawing strategy (only draws if absolutely necessary). |
+
+#### ⚙️ AI System Details
+
+- **3-Tier Dynamic Latency**: AI delays are split into: `Same Color` (0.8s-1.2s), `New Color` (1.5s-2.0s), and `Wild/Rethink` (2.5s+).
+- **Rethink Logic**: AI timers reset when the pile color changes, simulating the time needed to adapt to new game states.
+- **Full Integration**: AI players correctly respond to `Skip` and `Reverse` cards (persistent `frozen` flag) and interact with the same world rules as humans.
 
 ---
 

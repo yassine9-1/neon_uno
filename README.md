@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ NEON-UNO ⚡
+# NEON-UNO
 
 <p>
   <img src="https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white" alt="Node.js"/>
@@ -27,14 +27,14 @@ _Un jeu de cartes multijoueur massif et colocalisé — smartphones comme manett
 
 | Fonctionnalité             | Description                                                                                                                                                 |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🖥️ **Écran Géant**         | Affiche l'arène de jeu, la carte en cours, la répartition des joueurs, la jauge de score et des animations spectaculaires (lasers, explosions, particules). |
-| 📱 **Manettes Smartphone** | Rejoignez en scannant le QR code. Tri auto des cartes par couleur. UI adaptative.      |
-| 🤝 **Deux Équipes**        | Attribution aléatoire. Les points utilisent des poids dynamiques pour remplir la jauge.|
-| 📡 **Persistance d'État**  | Supporte la reconnexion et le rafraîchissement : état (main, scores) préservé.         |
-| 🦠 **Événement Virus**     | Un virus aléatoire gèle le jeu : secouez votre téléphone pour vous soigner !           |
-| 🃏 **Cartes Spéciales**    | Les effets ciblent toujours l'équipe adverse (+2/+4, gel d'équipe).                   |
-| 📳 **Retours Haptiques**   | L'accéléromètre et les vibrations rendent le jeu encore plus immersif.                 |
-| 📈 **Popups de Score**     | Affichage des gains de score en temps réel à la position des joueurs sur le projecteur.|
+| **Écran Géant**         | Affiche l'arène de jeu, la carte en cours, la répartition des joueurs, la jauge de score et des animations spectaculaires. |
+| **Manettes Smartphone** | Rejoignez en scannant le QR code. Tri auto des cartes par couleur. UI adaptative.      |
+| **Deux Équipes**        | Attribution aléatoire. Les points utilisent des poids dynamiques pour remplir la jauge.|
+| **Persistance d'État**  | Supporte la reconnexion et le rafraîchissement : état (main, scores) préservé.         |
+| **Événement Virus**     | Un virus aléatoire gèle le jeu : secouez votre téléphone pour vous soigner !           |
+| **Cartes Spéciales**    | Les effets ciblent toujours l'équipe adverse (+2/+4, gel d'équipe).                   |
+| **Haptique & Feedback** | Accéléromètre, vibrations et popups de score pour une immersion totale.                |
+| **Réactions Emojis**    | Envoyez des emojis pendant et après le match (avec animations de fête globales).   |
 
 ---
 
@@ -75,7 +75,9 @@ Si aucune carte ne convient, le joueur peut **secouer son téléphone** pour pio
 
 NEON-UNO utilise un système de score pondéré dynamique. Chaque carte posée avec succès rapporte un **score flottant** calculé selon plusieurs facteurs :
 
-**`Score Final = Base (Humain 2 / AI 1) × Palier 1 (Nombre de cartes) × Palier 2 (Variété) × Palier 3 (Série)`**
+**`Score Final = Base (Humain 2.0 / IA par tier) × Palier 1 (Nombre de cartes) × Palier 2 (Variété) × Palier 3 (Série)`**
+
+> **Logique Unifiée** : L'IA et les joueurs humains partagent désormais le même moteur de traitement (`processPlayCard`), garantissant une équité absolue sur les scores, les règles et les effets.
 
 #### 1. Palier 1 : Multiplicateur de Cartes en Main
 Moins vous avez de cartes, plus le score est élevé (récompense du risque).
@@ -137,13 +139,21 @@ Lorsque la pioche tombe en dessous de **10 cartes**, un nouveau paquet complet d
 
 ## 🤖 Joueurs AI
 
-L'hôte peut ajouter jusqu'à **5 joueurs AI** depuis l'écran lobby (bouton « 🤖 Ajouter AI » en bas). Chaque AI reçoit un nom aléatoire suivi de `[AI]` et une personnalité tirée au sort parmi trois types. **Les AI contribuent +1/−1 point par carte jouée** (contre +2/−2 pour les joueurs humains).
+L'hôte peut ajouter jusqu'à **5 joueurs AI** depuis l'écran lobby (bouton « 🤖 Ajouter AI »). L'IA a été entièrement revue avec un scoring équilibré et une logique par paliers.
 
-| Personnalité | Vitesse | Intervalle | Algorithme | Comportement |
+#### 🧠 Tiers d'IA
+
+| Personnalité | Score de Base | Profil de Vitesse | Algorithme | Caractéristiques |
 |---|---|---|---|---|
-| **⚡ Rapide** (_fast_) | Très rapide | 1 s max | **Naïf** — joue la première carte valide trouvée dans sa main, sans aucune stratégie. | Oublie parfois de crier UNO (50 % de chance). Se soigne rarement du virus (40 %). |
-| **⚖️ Modéré** (_medium_) | Modéré | 1.5 s max | **Tactique** — priorise les cartes action (Skip, Reverse, +2) de même couleur, puis les cartes de même couleur, puis même valeur, et garde les Jokers en dernier recours. | Crie UNO de manière fiable. Se soigne du virus souvent (70 %). |
-| **🧠 Stratège** (_slow_) | Lent | 2.5 s max | **Intelligent** — priorise +2 de même couleur pour attaquer, puis Skip/Reverse pour geler l'adversaire, puis joue dans sa couleur dominante (la couleur dont il possède le plus de cartes) pour contrôler le jeu, et réserve les Joker +4 et Joker en dernier. | Crie toujours UNO. Se soigne presque toujours du virus (95 %). |
+| **⚡ Novice** (_noob_) | **0.7** | Très rapide | **Aléatoire** | Priorise les cartes de la **même couleur** que la pile. Sa frénésie est compensée par les forts malus de Série (Streak). |
+| **⚖️ Casual** | **1.0** | Modéré | **Heuristique Tactique** | Priorités : action > couleur > valeur. Un adversaire équilibré. |
+| **🧠 Expert** (_pro_) | **1.3** | Délibéré | **Lookahead 2-étapes** | Simule les états futurs pour maximiser le "score par seconde". Stratégie de pioche pessimiste (ne pioche que si nécessaire). |
+
+#### ⚙️ Détails du Système AI
+
+- **Latence Dynamique** : Les délais de l'IA sont divisés en trois : `Même Couleur` (0.8s-1.2s), `Nouvelle Couleur` (1.5s-2.0s), et `Réflexion/Joker` (2.5s+).
+- **Logique de Réflexion** : Les timers de l'IA se réinitialisent quand la couleur de la pile change, simulant le temps d'adaptation.
+- **Intégration Totale** : Les IA réagissent désormais correctement aux cartes `Passer` et `Inversion` (flag `frozen` persistant) et respectent les mêmes règles que les humains.
 
 ---
 
