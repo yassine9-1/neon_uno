@@ -928,6 +928,7 @@ button {
   max-width: 320px;
   width: 90%;
   box-shadow: 0 0 25px rgba(114, 239, 249, 0.3);
+  margin-bottom: 20px;
 }
 
 .emoji-grid {
