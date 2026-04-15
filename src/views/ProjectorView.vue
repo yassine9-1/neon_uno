@@ -148,6 +148,10 @@
         <div v-for="p in positionedPlayers" :key="p.id" 
              class="player-node"
              :style="{ left: p.x + '%', top: p.y + '%' }">
+          <!-- Emoji bubble -->
+          <transition name="emoji-bubble">
+            <div v-if="playerEmojis[p.id]" class="emoji-bubble">{{ playerEmojis[p.id] }}</div>
+          </transition>
           <div class="player-circle" :class="[p.team]">
             <svg class="avatar-svg" viewBox="0 0 64 64" fill="none">
               <circle cx="32" cy="24" r="12" fill="currentColor" opacity="0.9"/>
@@ -206,6 +210,10 @@ const queueSize = ref(30)
 const deckRadius = ref(300)
 const showSettings = ref(false)
 let cardIdCounter = 0
+
+// Emoji state
+const playerEmojis = reactive({})
+const emojiTimers = {}
 
 // Drag-and-drop state
 let draggedPlayerId = null
@@ -542,6 +550,15 @@ socket.on('virus_resolved', (infectedPlayers) => {
   }
 })
 
+socket.on('player_emoji', ({ playerId, emoji }) => {
+  playerEmojis[playerId] = emoji
+  if (emojiTimers[playerId]) clearTimeout(emojiTimers[playerId])
+  emojiTimers[playerId] = setTimeout(() => {
+    delete playerEmojis[playerId]
+    delete emojiTimers[playerId]
+  }, 3000)
+})
+
 socket.on('game_over', (data) => {
   isGameOver.value = true
   gameStarted.value = false
@@ -591,6 +608,7 @@ onUnmounted(() => {
   socket.off('card_played_success')
   socket.off('virus_event')
   socket.off('virus_resolved')
+  socket.off('player_emoji')
   socket.off('game_over')
   socket.off('sync_state')
 })
@@ -1109,6 +1127,44 @@ onUnmounted(() => {
 
 .player-name.blue { color: var(--neon-blue); text-shadow: 0 0 5px var(--neon-blue); }
 .player-name.magenta { color: var(--neon-magenta); text-shadow: 0 0 5px var(--neon-magenta); }
+
+/* Emoji bubble above player */
+.emoji-bubble {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 2.8rem;
+  background: rgba(0, 0, 0, 0.75);
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 2px solid rgba(255,255,255,0.25);
+  box-shadow: 0 0 15px rgba(255,255,255,0.15);
+  white-space: nowrap;
+  margin-bottom: 8px;
+  pointer-events: none;
+  z-index: 20;
+  line-height: 1.2;
+}
+
+.emoji-bubble-enter-active {
+  animation: emojiBounceIn 0.35s ease-out;
+}
+
+.emoji-bubble-leave-active {
+  animation: emojiFadeOut 0.3s ease-in forwards;
+}
+
+@keyframes emojiBounceIn {
+  0% { transform: translateX(-50%) scale(0.3); opacity: 0; }
+  60% { transform: translateX(-50%) scale(1.15); opacity: 1; }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+
+@keyframes emojiFadeOut {
+  0% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateX(-50%) translateY(-15px) scale(0.8); opacity: 0; }
+}
 
 .settings-panel {
   position: fixed;

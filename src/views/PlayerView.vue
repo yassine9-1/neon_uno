@@ -121,6 +121,21 @@
       </div>
     </div>
 
+    <!-- Emoji Button -->
+    <button class="emoji-toggle-btn" @click="showEmojiPanel = !showEmojiPanel">😀</button>
+
+    <!-- Emoji Panel -->
+    <div v-if="showEmojiPanel" class="emoji-panel-overlay" @click.self="showEmojiPanel = false">
+      <div class="emoji-panel">
+        <div class="emoji-grid">
+          <span v-for="e in emojis" :key="e" class="emoji-item" @click="sendEmoji(e)">{{ e }}</span>
+        </div>
+        <div class="emoji-text-grid">
+          <span v-for="t in emojiTexts" :key="t" class="emoji-text-item" @click="sendEmoji(t)">{{ t }}</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Attack / Freeze overlays (appended dynamically) -->
     <div v-if="showColorPicker" class="color-picker-overlay">
       <h2 style="color:white; text-shadow:0 0 10px white;">Choisissez la couleur</h2>
@@ -162,6 +177,20 @@ const isFrozen = ref(false)
 const handContainer = ref(null)
 const showColorPicker = ref(false)
 const pendingBlackCardId = ref(null)
+
+const showEmojiPanel = ref(false)
+const emojis = ['😀', '😅', '😭', '😡', '💀', '🤝', '🔥', '🤯']
+const emojiTexts = ['GG', 'LOL', 'WHAT', 'EZ']
+let lastEmojiTime = 0
+
+function sendEmoji(emoji) {
+  const now = Date.now()
+  if (now - lastEmojiTime < 2000) return // Rate limit: 1 emoji per 2s
+  lastEmojiTime = now
+  socket.emit('send_emoji', emoji)
+  showEmojiPanel.value = false
+  if (navigator.vibrate) navigator.vibrate(30)
+}
 
 const showUnoBtn = ref(false)
 const unoBtnColor = ref('#E74C3C')
@@ -855,5 +884,97 @@ button {
   border: 3px solid white;
   box-shadow: 0 0 15px rgba(255,255,255,0.5);
   cursor: pointer;
+}
+
+/* Emoji Feature */
+.emoji-toggle-btn {
+  position: fixed;
+  bottom: 15px;
+  right: 15px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.4);
+  background: rgba(11, 15, 25, 0.85);
+  font-size: 1.6rem;
+  cursor: pointer;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 12px rgba(255,255,255,0.2);
+  padding: 0;
+}
+
+.emoji-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.6);
+  z-index: 450;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding-bottom: 80px;
+}
+
+.emoji-panel {
+  background: rgba(30, 30, 50, 0.95);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 18px;
+  padding: 18px;
+  max-width: 320px;
+  width: 90%;
+  box-shadow: 0 0 25px rgba(114, 239, 249, 0.3);
+  margin-bottom: 20px;
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.emoji-item {
+  font-size: 2rem;
+  text-align: center;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: background 0.15s, transform 0.1s;
+  user-select: none;
+}
+
+.emoji-item:active {
+  background: rgba(255,255,255,0.15);
+  transform: scale(1.15);
+}
+
+.emoji-text-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.emoji-text-item {
+  text-align: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: white;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  transition: background 0.15s, transform 0.1s;
+  user-select: none;
+}
+
+.emoji-text-item:active {
+  background: rgba(255,255,255,0.2);
+  transform: scale(1.05);
 }
 </style>
