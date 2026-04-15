@@ -289,11 +289,17 @@ function aiPlayCard(aiId) {
     player.hand.splice(cardIndex, 1);
 
     // Handle black card color choice
+    const previousColor = gameState.currentCard.color;
     if (cardToPlay.color === 'black') {
         const chosenColor = aiChooseColor(player.hand);
         gameState.currentCard = { ...cardToPlay, color: chosenColor };
     } else {
         gameState.currentCard = cardToPlay;
+    }
+
+    // Reset AI timers if the pile color changed (simulates rethinking)
+    if (gameState.currentCard.color !== previousColor) {
+        resetAITimers();
     }
 
     // AI score contribution is 1 (not 2)
@@ -380,25 +386,40 @@ function aiPlayCard(aiId) {
     });
 }
 
+function scheduleAIPlay(playerId) {
+    const player = gameState.players[playerId];
+    if (!player || !player.isAI || !gameState.isStarted) return;
+    const speed = AI_SPEED[player.aiPersonality] || 4500;
+    const jitter = Math.random() * 500;
+    aiTimers[playerId] = setTimeout(() => {
+        aiPlayCard(playerId);
+        // Schedule next play after this one completes
+        scheduleAIPlay(playerId);
+    }, speed + jitter);
+}
+
 function startAIPlayers() {
     for (let playerId in gameState.players) {
         const player = gameState.players[playerId];
         if (player.isAI) {
-            const speed = AI_SPEED[player.aiPersonality] || 1500;
-            // Add random jitter to make it feel more natural
-            aiTimers[playerId] = setInterval(() => {
-                const jitter = Math.random() * 500;
-                setTimeout(() => aiPlayCard(playerId), jitter);
-            }, speed);
+            scheduleAIPlay(playerId);
         }
     }
 }
 
 function stopAllAI() {
     for (let timerId in aiTimers) {
-        clearInterval(aiTimers[timerId]);
+        clearTimeout(aiTimers[timerId]);
     }
     aiTimers = {};
+}
+
+// Reset all AI timers (simulates "rethinking" when the pile color changes)
+function resetAITimers() {
+    for (let playerId in aiTimers) {
+        clearTimeout(aiTimers[playerId]);
+        scheduleAIPlay(playerId);
+    }
 }
 
 function triggerVirus() {
@@ -638,6 +659,7 @@ io.on('connection', (socket) => {
             player.hand.splice(cardIndex, 1);
 
             // Update center card : LOGIQUE CORRIGÉE POUR LES CARTES NOIRES
+            const previousColor = gameState.currentCard.color;
             if (cardToPlay.color === 'black') {
                 // Si la couleur choisie est valide, on l'applique. Sinon, on force 'red' par défaut.
                 const validColors = ['red', 'blue', 'green', 'yellow'];
@@ -647,6 +669,11 @@ io.on('connection', (socket) => {
                 gameState.currentCard = { ...cardToPlay, color: newColor };
             } else {
                 gameState.currentCard = cardToPlay;
+            }
+
+            // Reset AI timers if the pile color changed (simulates rethinking)
+            if (gameState.currentCard.color !== previousColor) {
+                resetAITimers();
             }
 
             // Jauge Logic
