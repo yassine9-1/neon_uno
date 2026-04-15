@@ -1,0 +1,8 @@
+// First, install dependencies
+npm install
+
+// Then, build the project
+npm run build
+
+// Finally, run the server
+npm run start
