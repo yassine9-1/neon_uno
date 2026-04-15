@@ -33,7 +33,7 @@ const AI_LAST_NAMES = [
 ];
 
 const AI_PERSONALITIES = ['fast', 'medium', 'slow'];
-const AI_SPEED = { fast: 1000, medium: 1500, slow: 2500 };
+const AI_SPEED = { fast: 3000, medium: 4500, slow: 5500 };
 const MAX_AI_PLAYERS = 5;
 let aiIdCounter = 0;
 let aiTimers = {}; // Store AI play intervals
