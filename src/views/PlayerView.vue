@@ -62,7 +62,7 @@
       <div class="hint"><b>SWIPE UP</b> ou <b>LANCER</b> pour jouer.<br /><b>SECOUER</b> pour piocher.</div>
     </div>
 
-    <div class="hand-container" ref="handContainer">
+    <div class="hand-container" ref="handContainer" @scroll="handleScroll">
       <!-- Draw card -->
       <div
         class="my-card"
@@ -144,7 +144,7 @@ let touchStartY = 0
 
 // Selected card tracking via IntersectionObserver
 const playingOutId = ref(null) // ID of card being animated away
-let observer = null
+let scrollTimeout = null
 
 const baseColorMap = {
   red: '#2C0B0B',
@@ -342,22 +342,33 @@ function triggerAction(el) {
   }
 }
 
-function setupObserver() {
-  if (observer) observer.disconnect()
-  observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        if (entry.target.dataset.action === 'draw') {
-          focusedCardId.value = 'draw'
-        } else {
-          focusedCardId.value = entry.target.dataset.id
-        }
-        if (navigator.vibrate) navigator.vibrate(10)
+function handleScroll() {
+  if (scrollTimeout) clearTimeout(scrollTimeout)
+  scrollTimeout = setTimeout(() => {
+    if (!handContainer.value) return
+    const container = handContainer.value
+    const containerRect = container.getBoundingClientRect()
+    const containerCenter = containerRect.left + containerRect.width / 2
+
+    let closestId = null
+    let minDistance = Infinity
+
+    const cards = container.querySelectorAll('.my-card')
+    cards.forEach(card => {
+      const rect = card.getBoundingClientRect()
+      const cardCenter = rect.left + rect.width / 2
+      const dist = Math.abs(containerCenter - cardCenter)
+      if (dist < minDistance) {
+        minDistance = dist
+        closestId = card.dataset.action === 'draw' ? 'draw' : card.dataset.id
       }
     })
-  }, { root: handContainer.value, threshold: 0.6 })
 
-  handContainer.value.querySelectorAll('.my-card').forEach(c => observer.observe(c))
+    if (closestId && focusedCardId.value !== closestId) {
+      focusedCardId.value = closestId
+      if (navigator.vibrate) navigator.vibrate(10)
+    }
+  }, 50)
 }
 
 function attemptPlayCard(cardId) {
@@ -412,9 +423,9 @@ socket.on('your_hand', (hand) => {
   unoBtnColor.value = '#E74C3C'
   playingOutId.value = null // Clear animation state
 
-  // Re-setup observer after hand update
+  // Re-evaluate center card after hand update
   nextTick(() => {
-    setupObserver()
+    handleScroll()
   })
 })
 
@@ -486,8 +497,68 @@ socket.on('freeze_team', (data) => {
   }, 3000)
 })
 
+function handleKeydown(e) {
+  if (screen.value !== 'game') return
+
+  // Shortcut for curing virus (Space or Enter)
+  if (isVirus.value && (e.key === ' ' || e.key === 'Enter')) {
+    socket.emit('cure_virus')
+    isVirus.value = false
+    document.body.style.backgroundColor = '#2ECC71'
+    if (virusInterval) clearInterval(virusInterval)
+    return
+  }
+
+  const cardIds = ['draw', ...currentHand.value.map(c => c.id)]
+  let index = cardIds.indexOf(focusedCardId.value)
+
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault()
+    if (index === -1) index = 0
+    index = (index - 1 + cardIds.length) % cardIds.length
+    focusedCardId.value = cardIds[index]
+    scrollToFocused()
+  } else if (e.key === 'ArrowRight') {
+    e.preventDefault()
+    if (index === -1) index = 0
+    index = (index + 1) % cardIds.length
+    focusedCardId.value = cardIds[index]
+    scrollToFocused()
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    const el = focusedCardId.value === 'draw'
+      ? document.querySelector('[data-action="draw"]')
+      : document.querySelector(`[data-id="${focusedCardId.value}"]`)
+    if (el) triggerAction(el)
+  } else if (e.key === ' ' || e.key === 'Enter') {
+    // If NOT virus, Space/Enter can also draw a card (shortcut for shake)
+    if (!isVirus.value && !showColorPicker.value) {
+      e.preventDefault()
+      socket.emit('draw_card')
+    }
+  }
+}
+
+function scrollToFocused() {
+  nextTick(() => {
+    const id = focusedCardId.value
+    const el = id === 'draw'
+      ? document.querySelector('[data-action="draw"]')
+      : document.querySelector(`[data-id="${id}"]`)
+    
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+    }
+  })
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
 onUnmounted(() => {
-  if (observer) observer.disconnect()
+  window.removeEventListener('keydown', handleKeydown)
+  if (scrollTimeout) clearTimeout(scrollTimeout)
   if (virusInterval) clearInterval(virusInterval)
   window.removeEventListener('devicemotion', handleMotion)
   socket.off('joined_success')
