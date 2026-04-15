@@ -881,6 +881,14 @@ io.on('connection', (socket) => {
     });
 
     // Player needs a new card
+    socket.on('send_emoji', (emoji) => {
+        const player = gameState.players[socket.id];
+        if (!player || typeof emoji !== 'string') return;
+        const ALLOWED_EMOJIS = ['😀', '😅', '😭', '😡', '💀', '🤝', '🔥', '🤯', 'GG', 'LOL', 'WHAT', 'EZ'];
+        if (!ALLOWED_EMOJIS.includes(emoji)) return;
+        io.emit('player_emoji', { playerId: socket.id, username: player.username, emoji });
+    });
+
     socket.on('draw_card', () => {
         if (!gameState.isStarted || gameState.isVirus) return;
         const player = gameState.players[socket.id];
