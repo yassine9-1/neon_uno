@@ -150,7 +150,11 @@
              :style="{ left: p.x + '%', top: p.y + '%' }">
           <!-- Emoji bubble -->
           <transition name="emoji-bubble">
-            <div v-if="playerEmojis[p.id]" class="emoji-bubble">{{ playerEmojis[p.id] }}</div>
+            <div v-if="playerEmojis[p.id]" 
+                 class="emoji-bubble" 
+                 :class="{ 'game-over-emoji': isGameOver }">
+              {{ playerEmojis[p.id] }}
+            </div>
           </transition>
           <div class="player-circle" :class="[p.team]">
             <svg class="avatar-svg" viewBox="0 0 64 64" fill="none">
@@ -1058,7 +1062,7 @@ onUnmounted(() => {
 .virus-overlay h1 { font-size:6rem; color:white; text-shadow:0 0 30px red; animation:pulse 0.5s infinite alternate; }
 .virus-overlay h2 { font-size:3rem; color:white; }
 
-.gameover-overlay { background: rgba(0,0,0,0.85); z-index: 300; }
+.gameover-overlay { background: rgba(0,0,0,0.7); z-index: 300; backdrop-filter: blur(5px); }
 .gameover-overlay h1 { font-size: 6rem; margin-bottom: 0; }
 .gameover-overlay p { font-size: 2rem; color: white; margin-bottom: 30px; }
 .restart-btn {
@@ -1073,7 +1077,7 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 15;
+  z-index: 500; /* Above gameover-overlay */
 }
 
 .player-node {
@@ -1148,17 +1152,29 @@ onUnmounted(() => {
 }
 
 .emoji-bubble-enter-active {
-  animation: emojiBounceIn 0.35s ease-out;
+  animation: emojiPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.game-over-emoji {
+  animation: emojiFloatGameOver 3s infinite ease-in-out !important;
+  font-size: 3.5rem !important;
+  border-color: #ffd700 !important;
+  box-shadow: 0 0 25px rgba(255, 215, 0, 0.5) !important;
 }
 
 .emoji-bubble-leave-active {
   animation: emojiFadeOut 0.3s ease-in forwards;
 }
 
-@keyframes emojiBounceIn {
-  0% { transform: translateX(-50%) scale(0.3); opacity: 0; }
-  60% { transform: translateX(-50%) scale(1.15); opacity: 1; }
+@keyframes emojiPop {
+  0% { transform: translateX(-50%) scale(0); opacity: 0; }
   100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+
+@keyframes emojiFloatGameOver {
+  0%, 100% { transform: translateX(-50%) translateY(0) rotate(0deg); }
+  25% { transform: translateX(-50%) translateY(-15px) rotate(5deg); }
+  75% { transform: translateX(-50%) translateY(-5px) rotate(-5deg); }
 }
 
 @keyframes emojiFadeOut {

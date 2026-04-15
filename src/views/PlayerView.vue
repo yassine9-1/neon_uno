@@ -121,21 +121,6 @@
       </div>
     </div>
 
-    <!-- Emoji Button -->
-    <button class="emoji-toggle-btn" @click="showEmojiPanel = !showEmojiPanel">😀</button>
-
-    <!-- Emoji Panel -->
-    <div v-if="showEmojiPanel" class="emoji-panel-overlay" @click.self="showEmojiPanel = false">
-      <div class="emoji-panel">
-        <div class="emoji-grid">
-          <span v-for="e in emojis" :key="e" class="emoji-item" @click="sendEmoji(e)">{{ e }}</span>
-        </div>
-        <div class="emoji-text-grid">
-          <span v-for="t in emojiTexts" :key="t" class="emoji-text-item" @click="sendEmoji(t)">{{ t }}</span>
-        </div>
-      </div>
-    </div>
-
     <!-- Attack / Freeze overlays (appended dynamically) -->
     <div v-if="showColorPicker" class="color-picker-overlay">
       <h2 style="color:white; text-shadow:0 0 10px white;">Choisissez la couleur</h2>
@@ -147,7 +132,22 @@
       </div>
     </div>
 
-  </div> 
+  </div>
+
+  <!-- Global Emoji Button (shown when not in login) -->
+  <button v-if="screen !== 'login'" class="emoji-toggle-btn" @click="showEmojiPanel = !showEmojiPanel">😀</button>
+
+  <!-- Global Emoji Panel -->
+  <div v-if="showEmojiPanel" class="emoji-panel-overlay" @click.self="showEmojiPanel = false" style="z-index: 2000;">
+    <div class="emoji-panel">
+      <div class="emoji-grid">
+        <span v-for="e in emojis" :key="e" class="emoji-item" @click="sendEmoji(e)">{{ e }}</span>
+      </div>
+      <div class="emoji-text-grid">
+        <span v-for="t in emojiTexts" :key="t" class="emoji-text-item" @click="sendEmoji(t)">{{ t }}</span>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -648,6 +648,12 @@ onMounted(() => {
     username.value = savedUsername
     socket.emit('join_game', savedUsername)
   }
+
+  socket.on('team_changed', ({ playerId, newTeam }) => {
+    if (playerId === socket.id) {
+      myTeam.value = newTeam
+    }
+  })
 })
 
 
@@ -903,7 +909,7 @@ button {
   background: rgba(11, 15, 25, 0.85);
   font-size: 1.6rem;
   cursor: pointer;
-  z-index: 400;
+  z-index: 2000; /* Above gameover (1000) */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -918,7 +924,7 @@ button {
   width: 100%;
   height: 100%;
   background: rgba(0,0,0,0.6);
-  z-index: 450;
+  z-index: 2100;
   display: flex;
   justify-content: center;
   align-items: flex-end;
