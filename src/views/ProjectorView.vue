@@ -73,8 +73,11 @@
       </div>
     </div>
 
-    <!-- Start button -->
+    <!-- Footer: Add AI + Start -->
     <div class="lobby-footer">
+      <button v-if="aiCount < 5" class="add-ai-btn" @click="addAI">
+        🤖 添加AI ({{ aiCount }}/5)
+      </button>
       <button class="start-btn" @click="startGame">
         🚀 DÉMARRER LA BATAILLE
       </button>
@@ -207,6 +210,7 @@ let draggedPlayerId = null
 
 const bluePlayers = computed(() => Object.values(players).filter(p => p.team === 'blue'))
 const magentaPlayers = computed(() => Object.values(players).filter(p => p.team === 'magenta'))
+const aiCount = computed(() => Object.values(players).filter(p => p.isAI).length)
 
 const baseColorMap = {
   red: '#2C0B0B',
@@ -270,6 +274,10 @@ const blueRatio = computed(() => {
 
 function startGame() {
   socket.emit('start_game')
+}
+
+function addAI() {
+  socket.emit('add_ai')
 }
 
 function restartGame() {
@@ -705,8 +713,30 @@ onUnmounted(() => {
   padding: 20px 40px;
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 30px;
   border-top: 2px solid rgba(255,255,255,0.1);
   background: rgba(0,0,0,0.3);
+}
+
+.add-ai-btn {
+  padding: 15px 35px;
+  font-size: 1.4rem;
+  font-weight: bold;
+  border: 2px solid #2ECC71;
+  border-radius: 15px;
+  background: rgba(46, 204, 113, 0.15);
+  color: #2ECC71;
+  cursor: pointer;
+  box-shadow: 0 0 15px rgba(46, 204, 113, 0.4);
+  transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+  letter-spacing: 1px;
+}
+
+.add-ai-btn:hover {
+  transform: scale(1.04);
+  background: rgba(46, 204, 113, 0.25);
+  box-shadow: 0 0 25px rgba(46, 204, 113, 0.6);
 }
 
 .start-btn {
