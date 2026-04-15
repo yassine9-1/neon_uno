@@ -28,11 +28,13 @@ _A massive co-located multiplayer card game — smartphones as controllers, proj
 | Feature                       | Description                                                                                                                             |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | 🖥️ **Big Screen**             | Displays the game arena, current card, player distribution, score gauge and spectacular visual effects (lasers, explosions, particles). |
-| 📱 **Smartphone Controllers** | Players join the game by scanning the QR Code shown on screen.                                                                          |
-| 🤝 **Two Teams**              | Teams are randomly assigned. Points fill a shared gauge per team.                                                                       |
-| 🦠 **Virus Event**            | A random virus freezes the game: shake your phone to cure yourself, or receive penalties!                                               |
-| 🃏 **Special Cards**          | Effects always target the opposing team (+2/+4 random opponent, team freeze).                                                           |
-| 📳 **Haptic Feedback**        | Accelerometer and vibrations make the experience even more immersive.                                                                   |
+| 📱 **Smartphone Controllers** | Join by scanning QR code. Automatic card sorting by color. Adaptive UI.                |
+| 🤝 **Two Teams**              | Assigned randomly. Points use complex real-time weights to fill shared gauges.         |
+| 📡 **State Persistence**      | Supports reconnection and page refreshes: player state (hand, scores) is preserved.    |
+| 🦠 **Virus Event**            | A random virus freezes the game: shake your phone to cure yourself, or receive penalties!|
+| 🃏 **Special Cards**          | Effects always target the opposing team (+2/+4 random opponent, team freeze).          |
+| 📳 **Haptic Feedback**        | Accelerometer and vibrations make the experience even more immersive.                  |
+| 📈 **Score Popups**           | Real-time score gain displays at player positions on the projector screen.             |
 
 ---
 
@@ -71,12 +73,31 @@ If no card is suitable, the player can **shake their phone** to draw a card from
 
 ### 📊 Scoring System
 
-Every successfully played card modifies the team gauge:
+NEON-UNO uses a dynamic weighted scoring system. Each successfully played card rewards a **float score** based on multiple factors:
 
-- **+2 points** for the team of the player who played the card
-- **−2 points** for the opposing team
+**`Final Score = Base (Human 2 / AI 1) × Layer 1 (Hand Count) × Layer 2 (Variety) × Layer 3 (Streak)`**
 
-The **first team to reach 100 points** wins. If a player empties their hand before that, they also win the game individually.
+#### 1. Layer 1: Hand Count Multiplier
+The fewer cards you hold, the higher the score (rewarding high-risk play).
+- **1 card**: **1.8x**
+- **5-7 cards**: **1.0x** (Base)
+- **10+ cards**: Decays rapidly to **~0.4x**, minimum **0.3x**.
+
+#### 2. Layer 2: Color Variety Multiplier
+Rewards players for focusing on specific colors (controlling the game). Includes all 5 colors (Red, Blue, Green, Yellow, Black).
+- **1 color**: **1.8x**
+- **2 colors**: **1.3x**
+- **3 colors**: **1.0x**
+- **4 colors**: **0.7x**
+- **5 colors**: **0.3x**
+
+#### 3. Layer 3: Same-Color Streak Multiplier
+Penalizes playing the same color consecutively without strategy.
+- **Color Change / 1st Card**: **1.2x** reward.
+- **2nd consecutive same color**: **1.0x**.
+- **5th consecutive same color**: **~0.5x**, minimum asymptotic to **0.35x**.
+
+**Winning Condition**: The **first team to reach 100 points** wins. Emptying your hand no longer directly wins the game, but provides a massive point boost for the team. Players keep drawing and playing after emptying their hand.
 
 ### 🔮 Special Card Effects
 
@@ -111,6 +132,18 @@ Every **1 to 2 minutes**, a **Virus** alert triggers without warning:
 ### ♻️ Deck Refill
 
 When the draw pile drops below **10 cards**, a brand new shuffled deck of 108 cards is automatically added. The game never stops for lack of cards.
+
+---
+
+## 🤖 AI Players
+
+The host can add up to **5 AI players** from the lobby screen (via the "🤖 Add AI" button at the bottom). Each AI gets a random name followed by `[AI]` and is randomly assigned one of three personality types. **AI players contribute +1/−1 point per card played** (compared to +2/−2 for human players).
+
+| Personality | Speed | Interval | Algorithm | Behaviour |
+|---|---|---|---|---|
+| **⚡ Fast** | Very fast | 1 s max | **Naive** — plays the first valid card found in hand, with no strategy at all. | Forgets to call UNO sometimes (50% chance). Rarely cures from virus (40%). |
+| **⚖️ Medium** | Moderate | 1.5 s max | **Tactical** — prioritises action cards (Skip, Reverse, +2) of matching colour, then same-colour cards, then same-value cards, and saves Wild cards as a last resort. | Reliably calls UNO. Often cures from virus (70%). |
+| **🧠 Smart** (_slow_) | Slow | 2.5 s max | **Intelligent** — prioritises +2 of matching colour to attack, then Skip/Reverse to freeze opponents, then plays its dominant colour (the colour it holds most of) to control the game, and reserves Wild Draw 4 and Wild cards for last. | Always calls UNO. Almost always cures from virus (95%). |
 
 ---
 

@@ -40,7 +40,8 @@
             draggable="true"
             @dragstart="onDragStart($event, player.id)"
           >
-            {{ player.username }}
+            <span class="player-name-text">{{ player.username }}</span>
+            <button v-if="player.isAI" class="remove-ai-btn" @click.stop="removeAI(player.id)">❌</button>
           </div>
           <div v-if="bluePlayers.length === 0" class="empty-slot">En attente…</div>
         </div>
@@ -66,15 +67,19 @@
             draggable="true"
             @dragstart="onDragStart($event, player.id)"
           >
-            {{ player.username }}
+            <span class="player-name-text">{{ player.username }}</span>
+            <button v-if="player.isAI" class="remove-ai-btn" @click.stop="removeAI(player.id)">❌</button>
           </div>
           <div v-if="magentaPlayers.length === 0" class="empty-slot">En attente…</div>
         </div>
       </div>
     </div>
 
-    <!-- Start button -->
+    <!-- Footer: Add AI + Start -->
     <div class="lobby-footer">
+      <button v-if="aiCount < 5" class="add-ai-btn" @click="addAI">
+        🤖 Ajouter AI ({{ aiCount }}/5)
+      </button>
       <button class="start-btn" @click="startGame">
         🚀 DÉMARRER LA BATAILLE
       </button>
@@ -143,6 +148,14 @@
         <div v-for="p in positionedPlayers" :key="p.id" 
              class="player-node"
              :style="{ left: p.x + '%', top: p.y + '%' }">
+          <!-- Emoji bubble -->
+          <transition name="emoji-bubble">
+            <div v-if="playerEmojis[p.id]" 
+                 class="emoji-bubble" 
+                 :class="{ 'game-over-emoji': isGameOver }">
+              {{ playerEmojis[p.id] }}
+            </div>
+          </transition>
           <div class="player-circle" :class="[p.team]">
             <svg class="avatar-svg" viewBox="0 0 64 64" fill="none">
               <circle cx="32" cy="24" r="12" fill="currentColor" opacity="0.9"/>
@@ -202,11 +215,16 @@ const deckRadius = ref(300)
 const showSettings = ref(false)
 let cardIdCounter = 0
 
+// Emoji state
+const playerEmojis = reactive({})
+const emojiTimers = {}
+
 // Drag-and-drop state
 let draggedPlayerId = null
 
 const bluePlayers = computed(() => Object.values(players).filter(p => p.team === 'blue'))
 const magentaPlayers = computed(() => Object.values(players).filter(p => p.team === 'magenta'))
+const aiCount = computed(() => Object.values(players).filter(p => p.isAI).length)
 
 const baseColorMap = {
   red: '#2C0B0B',
@@ -270,6 +288,14 @@ const blueRatio = computed(() => {
 
 function startGame() {
   socket.emit('start_game')
+}
+
+function addAI() {
+  socket.emit('add_ai')
+}
+
+function removeAI(aiId) {
+  socket.emit('remove_ai', aiId)
 }
 
 function restartGame() {
@@ -393,12 +419,35 @@ watch(queueSize, (newSize) => {
   }
 })
 
-function showFeedback(text, color) {
+function showFeedback(text, color, scoreGained = null, playerPos = null) {
   const el = document.createElement('div')
   el.innerText = text
   el.className = 'play-feedback neon-text'
   if (color) el.style.color = color
   document.body.appendChild(el)
+  
+  if (scoreGained && playerPos) {
+    const scoreEl = document.createElement('div')
+    scoreEl.innerText = `+${scoreGained}`
+    const glowColor = color || (playerPos.team === 'blue' ? '#72EFF9' : '#F572F7')
+    scoreEl.style.cssText = `
+      position: fixed;
+      left: ${playerPos.x}%;
+      top: ${playerPos.y - 5}%;
+      font-size: 2.5rem;
+      font-weight: 900;
+      font-family: 'Orbitron', sans-serif;
+      color: ${glowColor};
+      text-shadow: 0 0 10px ${glowColor}, 0 0 30px ${glowColor}, 0 0 50px ${glowColor};
+      pointer-events: none;
+      z-index: 1000;
+      transform: translate(-50%, -50%);
+      animation: scoreFloat 1.5s ease-out forwards;
+    `
+    document.body.appendChild(scoreEl)
+    setTimeout(() => scoreEl.remove(), 1500)
+  }
+
   setTimeout(() => el.remove(), 2000)
 }
 
@@ -484,10 +533,13 @@ socket.on('card_played_success', (data) => {
   createExplosion()
   fireLaser(data.username)
 
+  const p = positionedPlayers.value.find(pl => pl.username === data.username)
+  const teamColor = p ? (p.team === 'blue' ? '#72EFF9' : '#F572F7') : null
+
   if (data.unoOupli) {
-    showFeedback(`OBLI DE UNO ! +2 pour ${data.username}`, '#E74C3C')
+    showFeedback(`OBLI DE UNO ! +2 pour ${data.username}`, '#E74C3C', data.scoreGained, p)
   } else {
-    showFeedback(`${data.username} a joué !`)
+    showFeedback(`${data.username} a joué !`, teamColor, data.scoreGained, p)
   }
 })
 
@@ -502,6 +554,15 @@ socket.on('virus_resolved', (infectedPlayers) => {
   }
 })
 
+socket.on('player_emoji', ({ playerId, emoji }) => {
+  playerEmojis[playerId] = emoji
+  if (emojiTimers[playerId]) clearTimeout(emojiTimers[playerId])
+  emojiTimers[playerId] = setTimeout(() => {
+    delete playerEmojis[playerId]
+    delete emojiTimers[playerId]
+  }, 3000)
+})
+
 socket.on('game_over', (data) => {
   isGameOver.value = true
   gameStarted.value = false
@@ -512,12 +573,34 @@ socket.on('game_over', (data) => {
   winnerColor.value = data.team === 'blue' ? '#3498DB' : data.team === 'magenta' ? '#F572F7' : '#F1C40F'
 })
 
+socket.on('sync_state', (data) => {
+  gameStarted.value = data.isStarted
+  isVirus.value = data.isVirus
+  
+  // Synchroniser la liste des joueurs
+  Object.keys(players).forEach(key => delete players[key])
+  Object.assign(players, data.players)
+
+  if (data.isStarted && data.currentCard) {
+    // Si la partie est déjà lancée, on restaure la pile de cartes et les scores
+    cardPile.value = []
+    updateCenterCard(data.currentCard)
+    blueWidth.value = data.scores.blue
+    magentaWidth.value = data.scores.magenta
+  }
+})
+
+
 onMounted(() => {
   createParticles()
   updateDeckRadius()
   resizeObserver = new ResizeObserver(updateDeckRadius)
   if (deckAreaRef.value) resizeObserver.observe(deckAreaRef.value)
+  
+  // Demander la synchronisation au serveur
+  socket.emit('request_sync')
 })
+
 
 onUnmounted(() => {
   if (particleInterval) clearInterval(particleInterval)
@@ -529,8 +612,11 @@ onUnmounted(() => {
   socket.off('card_played_success')
   socket.off('virus_event')
   socket.off('virus_resolved')
+  socket.off('player_emoji')
   socket.off('game_over')
+  socket.off('sync_state')
 })
+
 </script>
 
 <style scoped>
@@ -653,6 +739,33 @@ onUnmounted(() => {
   user-select: none;
   text-align: center;
   transition: transform 0.15s, box-shadow 0.15s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.player-name-text {
+  flex-grow: 1;
+  text-align: center;
+}
+
+.remove-ai-btn {
+  position: absolute;
+  right: 15px;
+  background: transparent;
+  border: none;
+  color: #E74C3C;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  transition: transform 0.2s, filter 0.2s;
+}
+
+.remove-ai-btn:hover {
+  transform: scale(1.3);
+  filter: drop-shadow(0 0 5px #E74C3C);
 }
 
 .lobby-player:active {
@@ -705,8 +818,30 @@ onUnmounted(() => {
   padding: 20px 40px;
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 30px;
   border-top: 2px solid rgba(255,255,255,0.1);
   background: rgba(0,0,0,0.3);
+}
+
+.add-ai-btn {
+  padding: 15px 35px;
+  font-size: 1.4rem;
+  font-weight: bold;
+  border: 2px solid #2ECC71;
+  border-radius: 15px;
+  background: rgba(46, 204, 113, 0.15);
+  color: #2ECC71;
+  cursor: pointer;
+  box-shadow: 0 0 15px rgba(46, 204, 113, 0.4);
+  transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+  letter-spacing: 1px;
+}
+
+.add-ai-btn:hover {
+  transform: scale(1.04);
+  background: rgba(46, 204, 113, 0.25);
+  box-shadow: 0 0 25px rgba(46, 204, 113, 0.6);
 }
 
 .start-btn {
@@ -927,7 +1062,7 @@ onUnmounted(() => {
 .virus-overlay h1 { font-size:6rem; color:white; text-shadow:0 0 30px red; animation:pulse 0.5s infinite alternate; }
 .virus-overlay h2 { font-size:3rem; color:white; }
 
-.gameover-overlay { background: rgba(0,0,0,0.85); z-index: 300; }
+.gameover-overlay { background: rgba(0,0,0,0.7); z-index: 300; backdrop-filter: blur(5px); }
 .gameover-overlay h1 { font-size: 6rem; margin-bottom: 0; }
 .gameover-overlay p { font-size: 2rem; color: white; margin-bottom: 30px; }
 .restart-btn {
@@ -942,7 +1077,7 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 15;
+  z-index: 500; /* Above gameover-overlay */
 }
 
 .player-node {
@@ -996,6 +1131,56 @@ onUnmounted(() => {
 
 .player-name.blue { color: var(--neon-blue); text-shadow: 0 0 5px var(--neon-blue); }
 .player-name.magenta { color: var(--neon-magenta); text-shadow: 0 0 5px var(--neon-magenta); }
+
+/* Emoji bubble above player */
+.emoji-bubble {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 2.8rem;
+  background: rgba(0, 0, 0, 0.75);
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 2px solid rgba(255,255,255,0.25);
+  box-shadow: 0 0 15px rgba(255,255,255,0.15);
+  white-space: nowrap;
+  margin-bottom: 8px;
+  pointer-events: none;
+  z-index: 20;
+  line-height: 1.2;
+}
+
+.emoji-bubble-enter-active {
+  animation: emojiPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.game-over-emoji {
+  animation: emojiFloatGameOver 3s infinite ease-in-out !important;
+  font-size: 3.5rem !important;
+  border-color: #ffd700 !important;
+  box-shadow: 0 0 25px rgba(255, 215, 0, 0.5) !important;
+}
+
+.emoji-bubble-leave-active {
+  animation: emojiFadeOut 0.3s ease-in forwards;
+}
+
+@keyframes emojiPop {
+  0% { transform: translateX(-50%) scale(0); opacity: 0; }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+
+@keyframes emojiFloatGameOver {
+  0%, 100% { transform: translateX(-50%) translateY(0) rotate(0deg); }
+  25% { transform: translateX(-50%) translateY(-15px) rotate(5deg); }
+  75% { transform: translateX(-50%) translateY(-5px) rotate(-5deg); }
+}
+
+@keyframes emojiFadeOut {
+  0% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateX(-50%) translateY(-15px) scale(0.8); opacity: 0; }
+}
 
 .settings-panel {
   position: fixed;
@@ -1051,5 +1236,13 @@ onUnmounted(() => {
 
 .pile-card {
   animation: cardEnterFlash 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+</style>
+
+<style>
+/* Global (non-scoped) keyframe for dynamically created score popups on document.body */
+@keyframes scoreFloat {
+  0% { transform: translate(-50%, -50%) translateY(0); opacity: 1; }
+  100% { transform: translate(-50%, -50%) translateY(-60px); opacity: 0; }
 }
 </style>

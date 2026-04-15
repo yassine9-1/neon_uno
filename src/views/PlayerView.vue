@@ -59,10 +59,30 @@
         Capteurs
       </button>
 
-      <div class="hint"><b>SWIPE UP</b> ou <b>LANCER</b> pour jouer.<br /><b>SECOUER</b> pour piocher.</div>
+      <div class="hint">
+        <!-- Message principal (Urgent : Vide ou <3 cartes) -->
+        <div v-if="currentHand.length === 0" style="color:#F1C40F;font-weight:bold;animation:pulse 0.5s infinite alternate;font-size:1.1rem;">
+          ⚠️ L'ÉCRAN EST VIDE ! <br/>SWIPE UP sur la pile de gauche pour piocher !
+        </div>
+        <div v-else-if="currentHand.length <= 3" style="color:#F39C12;font-weight:bold;">
+          ⚠️ DERNIÈRES CARTES ! <br/>SWIPE UP à gauche si besoin de piocher.
+          <div v-if="uniqueColorCount === 1" style="color:#72EFF9;font-size:0.9rem;">🔥 BONUS SCORE x1.8 ACTIF</div>
+        </div>
+        
+        <!-- Message secondaire (Bonus de couleur) -->
+        <div v-else-if="uniqueColorCount === 1" style="color:#72EFF9;font-weight:bold;animation:pulse 2s infinite alternate;">
+          🔥 ZONE DE SCORE MAX ! <br/>Une seule couleur : Score x1.8 !
+        </div>
+        
+        <!-- Instructions par défaut -->
+        <div v-else>
+          <b>SWIPE UP</b> ou <b>LANCER</b> pour jouer.
+        </div>
+        <br /><b>SECOUER</b> pour piocher.
+      </div>
     </div>
 
-    <div class="hand-container" ref="handContainer">
+    <div class="hand-container" ref="handContainer" @scroll="handleScroll">
       <!-- Draw card -->
       <div
         class="my-card"
@@ -84,7 +104,7 @@
 
       <!-- Hand cards -->
       <div
-        v-for="card in currentHand"
+        v-for="card in sortedHand"
         :key="card.id"
         :data-id="card.id"
         class="my-card"
@@ -112,7 +132,22 @@
       </div>
     </div>
 
-  </div> 
+  </div>
+
+  <!-- Global Emoji Button (shown when not in login) -->
+  <button v-if="screen !== 'login'" class="emoji-toggle-btn" @click="showEmojiPanel = !showEmojiPanel">😀</button>
+
+  <!-- Global Emoji Panel -->
+  <div v-if="showEmojiPanel" class="emoji-panel-overlay" @click.self="showEmojiPanel = false" style="z-index: 2000;">
+    <div class="emoji-panel">
+      <div class="emoji-grid">
+        <span v-for="e in emojis" :key="e" class="emoji-item" @click="sendEmoji(e)">{{ e }}</span>
+      </div>
+      <div class="emoji-text-grid">
+        <span v-for="t in emojiTexts" :key="t" class="emoji-text-item" @click="sendEmoji(t)">{{ t }}</span>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -124,11 +159,38 @@ const usernameInput = ref('')
 const username = ref('')
 const myTeam = ref('')
 const currentHand = ref([])
+const colorOrder = ['red', 'blue', 'green', 'yellow', 'black']
+
+const sortedHand = computed(() => {
+  // Use a stable sort to group by color while maintaining the order of cards within each color group
+  return [...currentHand.value].sort((a, b) => {
+    return colorOrder.indexOf(a.color) - colorOrder.indexOf(b.color)
+  })
+})
+
+const uniqueColorCount = computed(() => {
+  return new Set(currentHand.value.map(c => c.color)).size
+})
+
 const isVirus = ref(false)
 const isFrozen = ref(false)
 const handContainer = ref(null)
 const showColorPicker = ref(false)
 const pendingBlackCardId = ref(null)
+
+const showEmojiPanel = ref(false)
+const emojis = ['😀', '😅', '😭', '😡', '💀', '🤝', '🔥', '🤯']
+const emojiTexts = ['GG', 'LOL', 'WHAT', 'EZ']
+let lastEmojiTime = 0
+
+function sendEmoji(emoji) {
+  const now = Date.now()
+  if (now - lastEmojiTime < 2000) return // Rate limit: 1 emoji per 2s
+  lastEmojiTime = now
+  socket.emit('send_emoji', emoji)
+  showEmojiPanel.value = false
+  if (navigator.vibrate) navigator.vibrate(30)
+}
 
 const showUnoBtn = ref(false)
 const unoBtnColor = ref('#E74C3C')
@@ -144,7 +206,7 @@ let touchStartY = 0
 
 // Selected card tracking via IntersectionObserver
 const playingOutId = ref(null) // ID of card being animated away
-let observer = null
+let scrollTimeout = null
 
 const baseColorMap = {
   red: '#2C0B0B',
@@ -201,9 +263,12 @@ function joinGame() {
   if (val.length > 0) {
     username.value = val
     usernameInput.value = ''
+    // Sauvegarder dans localStorage pour la reconnexion automatique
+    localStorage.setItem('neon_uno_username', val)
     socket.emit('join_game', username.value)
   }
 }
+
 
 function sayUno() {
   socket.emit('say_uno')
@@ -224,18 +289,18 @@ function onTouchStart(e) {
 }
 
 function onTouchEnd(e, cardId, action) {
-  if (isFrozen.value || playingOutId.value) return
   const touchEndY = e.changedTouches[0].screenY
   if (touchStartY - touchEndY > 50) {
     if (navigator.vibrate) navigator.vibrate([50, 30, 50])
-    playingOutId.value = action === 'draw' ? 'draw' : cardId
-
+    
     if (action === 'draw') {
-      socket.emit('draw_card')
-      // For draw, the card doesn't leave the hand, so reset its visual after timeout
-      setTimeout(() => { if (playingOutId.value === 'draw') playingOutId.value = null }, 300)
+      executeDraw()
     } else if (cardId) {
-      attemptPlayCard(cardId)
+      // For playing, we set the animation ID here to provide immediate feedback
+      if (!isFrozen.value && !isVirus.value && !playingOutId.value) {
+        playingOutId.value = cardId
+        attemptPlayCard(cardId)
+      }
     }
   }
 }
@@ -292,19 +357,27 @@ function handleMotion(event) {
   const y = event.acceleration.y || 0
   const x = event.acceleration.x || 0
 
+  // 1. Throwing movement (Y or Z axis)
   if (y > 15 || z > 15) {
     if (now - lastTime > 1000 && focusedCardId.value) {
       lastTime = now
-      const el = focusedCardId.value === 'draw' 
-        ? document.querySelector('[data-action="draw"]')
-        : document.querySelector(`[data-id="${focusedCardId.value}"]`)
-      if (el) triggerAction(el)
+      if (focusedCardId.value === 'draw') {
+        executeDraw()
+      } else {
+        // Find existing card and play it
+        const cardId = focusedCardId.value
+        if (cardId && !isFrozen.value && !isVirus.value && !playingOutId.value) {
+          playingOutId.value = cardId
+          attemptPlayCard(cardId)
+        }
+      }
     }
   }
 
   const deltaX = Math.abs(x - lastX)
   const deltaY = Math.abs(y - lastY)
 
+  // 2. Cure Virus (Shake)
   if (isVirus.value) {
     if (deltaX > 20 || deltaY > 20) {
       socket.emit('cure_virus')
@@ -318,51 +391,67 @@ function handleMotion(event) {
     return
   }
 
+  // 3. Shake to Draw
   if ((deltaX > 15 && deltaY > 15) && (now - lastShakeTime > 2000)) {
     lastShakeTime = now
     if (navigator.vibrate) navigator.vibrate([30, 30, 30])
-    socket.emit('draw_card')
+    executeDraw()
   }
 
   lastX = x
   lastY = y
 }
 
-function triggerAction(el) {
-  if (isFrozen.value || playingOutId.value) return
-  if (navigator.vibrate) navigator.vibrate([50, 30, 50])
+function executeDraw() {
+  if (isFrozen.value || isVirus.value || playingOutId.value) return
   
-  if (el.dataset.action === 'draw') {
-    playingOutId.value = 'draw'
-    socket.emit('draw_card')
-    setTimeout(() => { if (playingOutId.value === 'draw') playingOutId.value = null }, 300)
-  } else if (el.dataset.id) {
-    playingOutId.value = el.dataset.id
-    attemptPlayCard(el.dataset.id)
-  }
+  if (navigator.vibrate) navigator.vibrate([50, 30, 50])
+  playingOutId.value = 'draw'
+  socket.emit('draw_card')
+  
+  // Reset visual after timeout
+  setTimeout(() => { if (playingOutId.value === 'draw') playingOutId.value = null }, 300)
 }
 
-function setupObserver() {
-  if (observer) observer.disconnect()
-  observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        if (entry.target.dataset.action === 'draw') {
-          focusedCardId.value = 'draw'
-        } else {
-          focusedCardId.value = entry.target.dataset.id
-        }
-        if (navigator.vibrate) navigator.vibrate(10)
+function handleScroll() {
+  if (scrollTimeout) clearTimeout(scrollTimeout)
+  scrollTimeout = setTimeout(() => {
+    if (!handContainer.value) return
+    const container = handContainer.value
+    const containerRect = container.getBoundingClientRect()
+    const containerCenter = containerRect.left + containerRect.width / 2
+
+    let closestId = null
+    let minDistance = Infinity
+
+    const cards = container.querySelectorAll('.my-card')
+    cards.forEach(card => {
+      const rect = card.getBoundingClientRect()
+      const cardCenter = rect.left + rect.width / 2
+      const dist = Math.abs(containerCenter - cardCenter)
+      if (dist < minDistance) {
+        minDistance = dist
+        closestId = card.dataset.action === 'draw' ? 'draw' : card.dataset.id
       }
     })
-  }, { root: handContainer.value, threshold: 0.6 })
 
-  handContainer.value.querySelectorAll('.my-card').forEach(c => observer.observe(c))
+    if (closestId && focusedCardId.value !== closestId) {
+      focusedCardId.value = closestId
+      if (navigator.vibrate) navigator.vibrate(10)
+    }
+  }, 50)
 }
 
 function attemptPlayCard(cardId) {
+  if (isFrozen.value || isVirus.value) return
+  
   const card = currentHand.value.find(c => c.id === cardId)
-  if (card && card.color === 'black') {
+  if (!card) {
+    playingOutId.value = null
+    return
+  }
+
+  if (card.color === 'black') {
     // Si c'est une carte noire, on ouvre le sélecteur de couleur
     pendingBlackCardId.value = cardId
     showColorPicker.value = true
@@ -412,9 +501,9 @@ socket.on('your_hand', (hand) => {
   unoBtnColor.value = '#E74C3C'
   playingOutId.value = null // Clear animation state
 
-  // Re-setup observer after hand update
+  // Re-evaluate center card after hand update
   nextTick(() => {
-    setupObserver()
+    handleScroll()
   })
 })
 
@@ -445,13 +534,18 @@ socket.on('game_over', (data) => {
   if (virusInterval) clearInterval(virusInterval)
   isFrozen.value = true
   screen.value = 'gameover'
-  const color = data.team === 'blue' ? '#3498DB' : '#F572F7'
-  gameOverColor.value = color
-  if (data.winner === username.value) {
-    gameOverText.value = 'VOUS AVEZ GAGNÉ !'
+  
+  if (data.forced) {
+    gameOverText.value = 'PARTIE TERMINÉE'
+    gameOverColor.value = '#aaa'
+  } else if (data.team === myTeam.value) {
+    gameOverText.value = 'VICTOIRE !'
+    gameOverColor.value = '#2ECC71' // Vert néon pour la victoire
   } else {
-    gameOverText.value = `VICTOIRE DE\n${data.winner}`
+    gameOverText.value = 'DÉFAITE...'
+    gameOverColor.value = '#E74C3C' // Rouge pour la défaite
   }
+
   if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300])
 })
 
@@ -486,8 +580,86 @@ socket.on('freeze_team', (data) => {
   }, 3000)
 })
 
+function handleKeydown(e) {
+  if (screen.value !== 'game') return
+
+  // Shortcut for curing virus (Space or Enter)
+  if (isVirus.value && (e.key === ' ' || e.key === 'Enter')) {
+    socket.emit('cure_virus')
+    isVirus.value = false
+    document.body.style.backgroundColor = '#2ECC71'
+    if (virusInterval) clearInterval(virusInterval)
+    return
+  }
+
+  const cardIds = ['draw', ...sortedHand.value.map(c => c.id)]
+  let index = cardIds.indexOf(focusedCardId.value)
+
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault()
+    if (index === -1) index = 0
+    index = (index - 1 + cardIds.length) % cardIds.length
+    focusedCardId.value = cardIds[index]
+    scrollToFocused()
+  } else if (e.key === 'ArrowRight') {
+    e.preventDefault()
+    if (index === -1) index = 0
+    index = (index + 1) % cardIds.length
+    focusedCardId.value = cardIds[index]
+    scrollToFocused()
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    if (focusedCardId.value === 'draw') {
+      executeDraw()
+    } else if (focusedCardId.value) {
+      if (!isFrozen.value && !isVirus.value && !playingOutId.value) {
+        playingOutId.value = focusedCardId.value
+        attemptPlayCard(focusedCardId.value)
+      }
+    }
+  } else if (e.key === ' ' || e.key === 'Enter') {
+    // If NOT virus, Space/Enter can also draw a card (shortcut for shake)
+    if (!isVirus.value && !showColorPicker.value) {
+      e.preventDefault()
+      executeDraw()
+    }
+  }
+}
+
+function scrollToFocused() {
+  nextTick(() => {
+    const id = focusedCardId.value
+    const el = id === 'draw'
+      ? document.querySelector('[data-action="draw"]')
+      : document.querySelector(`[data-id="${id}"]`)
+    
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+    }
+  })
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+  
+  // Reconnexion automatique si un pseudo est déjà enregistré
+  const savedUsername = localStorage.getItem('neon_uno_username')
+  if (savedUsername) {
+    username.value = savedUsername
+    socket.emit('join_game', savedUsername)
+  }
+
+  socket.on('team_changed', ({ playerId, newTeam }) => {
+    if (playerId === socket.id) {
+      myTeam.value = newTeam
+    }
+  })
+})
+
+
 onUnmounted(() => {
-  if (observer) observer.disconnect()
+  window.removeEventListener('keydown', handleKeydown)
+  if (scrollTimeout) clearTimeout(scrollTimeout)
   if (virusInterval) clearInterval(virusInterval)
   window.removeEventListener('devicemotion', handleMotion)
   socket.off('joined_success')
@@ -723,5 +895,97 @@ button {
   border: 3px solid white;
   box-shadow: 0 0 15px rgba(255,255,255,0.5);
   cursor: pointer;
+}
+
+/* Emoji Feature */
+.emoji-toggle-btn {
+  position: fixed;
+  bottom: 15px;
+  right: 15px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.4);
+  background: rgba(11, 15, 25, 0.85);
+  font-size: 1.6rem;
+  cursor: pointer;
+  z-index: 2000; /* Above gameover (1000) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 12px rgba(255,255,255,0.2);
+  padding: 0;
+}
+
+.emoji-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.6);
+  z-index: 2100;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding-bottom: 80px;
+}
+
+.emoji-panel {
+  background: rgba(30, 30, 50, 0.95);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 18px;
+  padding: 18px;
+  max-width: 320px;
+  width: 90%;
+  box-shadow: 0 0 25px rgba(114, 239, 249, 0.3);
+  margin-bottom: 20px;
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.emoji-item {
+  font-size: 2rem;
+  text-align: center;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: background 0.15s, transform 0.1s;
+  user-select: none;
+}
+
+.emoji-item:active {
+  background: rgba(255,255,255,0.15);
+  transform: scale(1.15);
+}
+
+.emoji-text-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.emoji-text-item {
+  text-align: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: white;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  transition: background 0.15s, transform 0.1s;
+  user-select: none;
+}
+
+.emoji-text-item:active {
+  background: rgba(255,255,255,0.2);
+  transform: scale(1.05);
 }
 </style>

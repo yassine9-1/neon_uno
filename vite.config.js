@@ -13,12 +13,12 @@ export default defineConfig({
     host: true,
     proxy: {
       '/socket.io': {
-        target: 'https://localhost:3000',
+        target: 'https://localhost:8080',
         ws: true,
         secure: false
       },
       '/api': {
-        target: 'https://localhost:3000',
+        target: 'https://localhost:8080',
         secure: false
       }
     }
