@@ -251,7 +251,9 @@ function getCardSymbol(card) {
   if (!isNaN(parseInt(card.value))) {
     return `/assets/cards/symbols/num_${card.value}.png`
   } else {
-    return `/assets/cards/symbols/action_${card.value}.png`
+    // Correct mapping for wild_draw4 to action_draw4.png
+    const symbolValue = card.value === 'wild_draw4' ? 'draw4' : card.value
+    return `/assets/cards/symbols/action_${symbolValue}.png`
   }
 }
 
