@@ -114,6 +114,18 @@ When the draw pile drops below **10 cards**, a brand new shuffled deck of 108 ca
 
 ---
 
+## 🤖 AI Players
+
+The host can add up to **5 AI players** from the lobby screen (via the "🤖 Add AI" button at the bottom). Each AI gets a random name followed by `[AI]` and is randomly assigned one of three personality types. **AI players contribute +1/−1 point per card played** (compared to +2/−2 for human players).
+
+| Personality | Speed | Interval | Algorithm | Behaviour |
+|---|---|---|---|---|
+| **⚡ Fast** | Very fast | 1 s max | **Naive** — plays the first valid card found in hand, with no strategy at all. | Forgets to call UNO sometimes (50% chance). Rarely cures from virus (40%). |
+| **⚖️ Medium** | Moderate | 1.5 s max | **Tactical** — prioritises action cards (Skip, Reverse, +2) of matching colour, then same-colour cards, then same-value cards, and saves Wild cards as a last resort. | Reliably calls UNO. Often cures from virus (70%). |
+| **🧠 Smart** (_slow_) | Slow | 2.5 s max | **Intelligent** — prioritises +2 of matching colour to attack, then Skip/Reverse to freeze opponents, then plays its dominant colour (the colour it holds most of) to control the game, and reserves Wild Draw 4 and Wild cards for last. | Always calls UNO. Almost always cures from virus (95%). |
+
+---
+
 ## 🛠️ Prerequisites
 
 - [Node.js](https://nodejs.org/) (version **18+** recommended)

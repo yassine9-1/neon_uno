@@ -114,6 +114,18 @@ Lorsque la pioche tombe en dessous de **10 cartes**, un nouveau paquet complet d
 
 ---
 
+## 🤖 Joueurs AI
+
+L'hôte peut ajouter jusqu'à **5 joueurs AI** depuis l'écran lobby (bouton « 🤖 Ajouter AI » en bas). Chaque AI reçoit un nom aléatoire suivi de `[AI]` et une personnalité tirée au sort parmi trois types. **Les AI contribuent +1/−1 point par carte jouée** (contre +2/−2 pour les joueurs humains).
+
+| Personnalité | Vitesse | Intervalle | Algorithme | Comportement |
+|---|---|---|---|---|
+| **⚡ Rapide** (_fast_) | Très rapide | 1 s max | **Naïf** — joue la première carte valide trouvée dans sa main, sans aucune stratégie. | Oublie parfois de crier UNO (50 % de chance). Se soigne rarement du virus (40 %). |
+| **⚖️ Modéré** (_medium_) | Modéré | 1.5 s max | **Tactique** — priorise les cartes action (Skip, Reverse, +2) de même couleur, puis les cartes de même couleur, puis même valeur, et garde les Jokers en dernier recours. | Crie UNO de manière fiable. Se soigne du virus souvent (70 %). |
+| **🧠 Stratège** (_slow_) | Lent | 2.5 s max | **Intelligent** — priorise +2 de même couleur pour attaquer, puis Skip/Reverse pour geler l'adversaire, puis joue dans sa couleur dominante (la couleur dont il possède le plus de cartes) pour contrôler le jeu, et réserve les Joker +4 et Joker en dernier. | Crie toujours UNO. Se soigne presque toujours du virus (95 %). |
+
+---
+
 ## 🛠️ Prérequis
 
 - [Node.js](https://nodejs.org/) (version **18+** recommandée)

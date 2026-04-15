@@ -20,6 +20,30 @@ const COLORS = ['red', 'blue', 'green', 'yellow'];
 const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', 'draw2'];
 const SPECIALS = ['wild', 'wild_draw4'];
 
+// --- AI NAME GENERATION ---
+const AI_FIRST_NAMES = [
+    'Néon', 'Pixel', 'Cyber', 'Turbo', 'Nova',
+    'Blitz', 'Zappy', 'Laser', 'Cosmo', 'Volt',
+    'Sparky', 'Glitch', 'Flux', 'Prism', 'Echo'
+];
+const AI_LAST_NAMES = [
+    'Bot', 'Tron', 'Byte', 'Chip', 'Core',
+    'Link', 'Node', 'Bit', 'Wave', 'Pulse',
+    'Grid', 'Arc', 'Zen', 'Fox', 'Rex'
+];
+
+const AI_PERSONALITIES = ['fast', 'medium', 'slow'];
+const AI_SPEED = { fast: 4000, medium: 5500, slow: 6500 };
+const MAX_AI_PLAYERS = 5;
+let aiIdCounter = 0;
+let aiTimers = {}; // Store AI play intervals
+
+function generateAIName() {
+    const first = AI_FIRST_NAMES[Math.floor(Math.random() * AI_FIRST_NAMES.length)];
+    const last = AI_LAST_NAMES[Math.floor(Math.random() * AI_LAST_NAMES.length)];
+    return `${first}${last}`;
+}
+
 let gameState = {
     deck: [],
     currentCard: null,
@@ -83,6 +107,7 @@ function initGame() {
     }
     gameState.isStarted = true;
     scheduleVirus();
+    startAIPlayers();
 }
 
 function refillDeckIfNeeded() {
@@ -104,6 +129,299 @@ function scheduleVirus() {
     }, delay);
 }
 
+// --- AI PLAY LOGIC ---
+
+function findValidCards(hand, currentCard) {
+    return hand.filter(card =>
+        currentCard.color === 'black' ||
+        card.color === currentCard.color ||
+        card.value === currentCard.value ||
+        card.color === 'black'
+    );
+}
+
+// Fast AI: play the first valid card found (no strategy)
+function aiChooseCardFast(hand, currentCard) {
+    const valid = findValidCards(hand, currentCard);
+    if (valid.length === 0) return null;
+    return valid[0];
+}
+
+// Medium AI: prioritize action cards, then same-color, then wild
+function aiChooseCardMedium(hand, currentCard) {
+    const valid = findValidCards(hand, currentCard);
+    if (valid.length === 0) return null;
+
+    // 1. Prioritize action cards (skip, reverse, draw2) that match color
+    const actionColorMatch = valid.find(c =>
+        c.color !== 'black' &&
+        ['skip', 'reverse', 'draw2'].includes(c.value) &&
+        c.color === currentCard.color
+    );
+    if (actionColorMatch) return actionColorMatch;
+
+    // 2. Any non-black card matching color
+    const colorMatch = valid.find(c => c.color !== 'black' && c.color === currentCard.color);
+    if (colorMatch) return colorMatch;
+
+    // 3. Any non-black card matching value
+    const valueMatch = valid.find(c => c.color !== 'black' && c.value === currentCard.value);
+    if (valueMatch) return valueMatch;
+
+    // 4. Wild cards last
+    return valid[0];
+}
+
+// Slow/Smart AI: maximize score contribution through color control
+function aiChooseCardSmart(hand, currentCard) {
+    const valid = findValidCards(hand, currentCard);
+    if (valid.length === 0) return null;
+
+    // Count cards per color in hand (non-black)
+    const colorCounts = {};
+    for (const c of hand) {
+        if (c.color !== 'black') {
+            colorCounts[c.color] = (colorCounts[c.color] || 0) + 1;
+        }
+    }
+    // Find the dominant color (most cards of this color in hand)
+    let dominantColor = null;
+    let maxCount = 0;
+    for (const color in colorCounts) {
+        if (colorCounts[color] > maxCount) {
+            maxCount = colorCounts[color];
+            dominantColor = color;
+        }
+    }
+
+    // 1. Prioritize draw2/wild_draw4 to hurt opponents
+    const draw4 = valid.find(c => c.value === 'wild_draw4');
+    const draw2 = valid.find(c => c.value === 'draw2' && c.color === currentCard.color);
+    if (draw2) return draw2;
+
+    // 2. Play action cards (skip/reverse) that match color to freeze opponents
+    const actionMatch = valid.find(c =>
+        c.color !== 'black' &&
+        ['skip', 'reverse'].includes(c.value) &&
+        c.color === currentCard.color
+    );
+    if (actionMatch) return actionMatch;
+
+    // 3. Play a card of the dominant color if possible (to steer the game towards that color)
+    if (dominantColor) {
+        const dominantCard = valid.find(c => c.color === dominantColor);
+        if (dominantCard) return dominantCard;
+    }
+
+    // 4. Play any non-black valid card
+    const nonBlack = valid.find(c => c.color !== 'black');
+    if (nonBlack) return nonBlack;
+
+    // 5. Use wild_draw4 if available (strong play)
+    if (draw4) return draw4;
+
+    // 6. Use regular wild card last
+    return valid[0];
+}
+
+function aiChooseColor(hand) {
+    // Choose the color the AI has most of
+    const colorCounts = {};
+    for (const c of hand) {
+        if (c.color !== 'black') {
+            colorCounts[c.color] = (colorCounts[c.color] || 0) + 1;
+        }
+    }
+    let bestColor = 'red';
+    let maxCount = 0;
+    for (const color in colorCounts) {
+        if (colorCounts[color] > maxCount) {
+            maxCount = colorCounts[color];
+            bestColor = color;
+        }
+    }
+    return bestColor;
+}
+
+function aiChooseCard(personality, hand, currentCard) {
+    switch (personality) {
+        case 'fast': return aiChooseCardFast(hand, currentCard);
+        case 'medium': return aiChooseCardMedium(hand, currentCard);
+        case 'slow': return aiChooseCardSmart(hand, currentCard);
+        default: return aiChooseCardFast(hand, currentCard);
+    }
+}
+
+function aiPlayCard(aiId) {
+    if (!gameState.isStarted || gameState.isVirus) return;
+    const player = gameState.players[aiId];
+    if (!player || !player.isAI || player.hand.length === 0) return;
+
+    const card = aiChooseCard(player.aiPersonality, player.hand, gameState.currentCard);
+
+    if (!card) {
+        // Draw a card
+        if (gameState.deck.length > 0) {
+            refillDeckIfNeeded();
+            const newCard = gameState.deck.pop();
+            player.hand.push(newCard);
+            player.saidUno = false;
+        }
+        return;
+    }
+
+    const cardIndex = player.hand.findIndex(c => c.id === card.id);
+    if (cardIndex === -1) return;
+
+    const cardToPlay = player.hand[cardIndex];
+    const current = gameState.currentCard;
+
+    // Re-validate
+    const isValid =
+        current.color === 'black' ||
+        cardToPlay.color === current.color ||
+        cardToPlay.value === current.value ||
+        cardToPlay.color === 'black';
+
+    if (!isValid) return;
+
+    // Remove from hand
+    player.hand.splice(cardIndex, 1);
+
+    // Handle black card color choice
+    const previousColor = gameState.currentCard.color;
+    if (cardToPlay.color === 'black') {
+        const chosenColor = aiChooseColor(player.hand);
+        gameState.currentCard = { ...cardToPlay, color: chosenColor };
+    } else {
+        gameState.currentCard = cardToPlay;
+    }
+
+    // Reset AI timers if the pile color changed (simulates rethinking)
+    if (gameState.currentCard.color !== previousColor) {
+        resetAITimers();
+    }
+
+    // AI score contribution is 1 (not 2)
+    if (player.team === 'blue') {
+        gameState.scores.blue += 1;
+        gameState.scores.magenta -= 1;
+    } else {
+        gameState.scores.magenta += 1;
+        gameState.scores.blue -= 1;
+    }
+
+    // Check win by gauge
+    if (gameState.scores.blue >= 100 || gameState.scores.magenta >= 100) {
+        let winningTeam = gameState.scores.blue >= 100 ? 'blue' : 'magenta';
+        let winMsg = `L'ÉQUIPE ${winningTeam === 'blue' ? 'NÉON BLEU' : 'NÉON ROSE'}`;
+        io.emit('game_over', { winner: winMsg, team: winningTeam });
+        gameState.isStarted = false;
+        if (gameState.virusTimeout) clearTimeout(gameState.virusTimeout);
+        stopAllAI();
+        return;
+    }
+
+    // Special card effects
+    refillDeckIfNeeded();
+    let opposingTeam = player.team === 'blue' ? 'magenta' : 'blue';
+    let opposingPlayers = Object.values(gameState.players).filter(p => p.team === opposingTeam);
+
+    if (cardToPlay.value === 'draw2' || cardToPlay.value === 'wild_draw4') {
+        if (opposingPlayers.length > 0) {
+            let target = opposingPlayers[Math.floor(Math.random() * opposingPlayers.length)];
+            let cardsToDraw = cardToPlay.value === 'draw2' ? 2 : 4;
+            for (let i = 0; i < cardsToDraw; i++) {
+                refillDeckIfNeeded();
+                if (gameState.deck.length > 0) {
+                    target.hand.push(gameState.deck.pop());
+                }
+            }
+            if (!target.isAI) {
+                io.to(target.id).emit('your_hand', target.hand);
+                io.to(target.id).emit('attacked', { by: player.username, cards: cardsToDraw });
+            }
+        }
+    } else if (cardToPlay.value === 'skip' || cardToPlay.value === 'reverse') {
+        opposingPlayers.forEach(p => {
+            if (!p.isAI) {
+                io.to(p.id).emit('freeze_team', { by: player.username });
+            }
+        });
+    }
+
+    // UNO logic: Smart and medium AIs say UNO proactively
+    if (player.hand.length <= 2 && player.hand.length > 0) {
+        if (player.aiPersonality === 'slow' || player.aiPersonality === 'medium') {
+            player.saidUno = true;
+        }
+        // Fast AI forgets sometimes (50% chance)
+        if (player.aiPersonality === 'fast' && Math.random() > 0.5) {
+            player.saidUno = true;
+        }
+    }
+
+    let unoOupli = false;
+    if (player.hand.length === 1 && !player.saidUno) {
+        unoOupli = true;
+        refillDeckIfNeeded();
+        if (gameState.deck.length >= 2) {
+            player.hand.push(gameState.deck.pop(), gameState.deck.pop());
+        }
+    } else if (player.hand.length === 0) {
+        io.emit('game_over', { winner: player.username, team: player.team });
+        gameState.isStarted = false;
+        if (gameState.virusTimeout) clearTimeout(gameState.virusTimeout);
+        stopAllAI();
+    }
+    player.saidUno = false;
+
+    // Broadcast
+    io.emit('card_played_success', {
+        playerId: aiId,
+        username: player.username,
+        card: gameState.currentCard,
+        scores: gameState.scores,
+        unoOupli: unoOupli
+    });
+}
+
+function scheduleAIPlay(playerId) {
+    const player = gameState.players[playerId];
+    if (!player || !player.isAI || !gameState.isStarted) return;
+    const speed = AI_SPEED[player.aiPersonality] || 4500;
+    const jitter = Math.random() * 500;
+    aiTimers[playerId] = setTimeout(() => {
+        aiPlayCard(playerId);
+        // Schedule next play after this one completes
+        scheduleAIPlay(playerId);
+    }, speed + jitter);
+}
+
+function startAIPlayers() {
+    for (let playerId in gameState.players) {
+        const player = gameState.players[playerId];
+        if (player.isAI) {
+            scheduleAIPlay(playerId);
+        }
+    }
+}
+
+function stopAllAI() {
+    for (let timerId in aiTimers) {
+        clearTimeout(aiTimers[timerId]);
+    }
+    aiTimers = {};
+}
+
+// Reset all AI timers (simulates "rethinking" when the pile color changes)
+function resetAITimers() {
+    for (let playerId in aiTimers) {
+        clearTimeout(aiTimers[playerId]);
+        scheduleAIPlay(playerId);
+    }
+}
+
 function triggerVirus() {
     if (!gameState.isStarted) return;
     gameState.isVirus = true;
@@ -111,6 +429,24 @@ function triggerVirus() {
     // Reset cured state
     for (let playerId in gameState.players) {
         gameState.players[playerId].cured = false;
+    }
+
+    // AI virus response: smart AIs cure quickly, medium sometimes, fast rarely
+    for (let playerId in gameState.players) {
+        const player = gameState.players[playerId];
+        if (player.isAI) {
+            let cureChance = 0;
+            if (player.aiPersonality === 'slow') cureChance = 0.95;
+            else if (player.aiPersonality === 'medium') cureChance = 0.7;
+            else cureChance = 0.4;
+            
+            const delay = 1000 + Math.random() * 3000;
+            setTimeout(() => {
+                if (gameState.isVirus && Math.random() < cureChance) {
+                    player.cured = true;
+                }
+            }, delay);
+        }
     }
 
     io.emit('virus_event');
@@ -133,7 +469,9 @@ function resolveVirus() {
             if (gameState.deck.length >= 2) {
                 player.hand.push(gameState.deck.pop(), gameState.deck.pop());
                 infectedPlayers.push(player.username);
-                io.to(player.id).emit('your_hand', player.hand);
+                if (!player.isAI) {
+                    io.to(player.id).emit('your_hand', player.hand);
+                }
             }
         }
     }
@@ -201,7 +539,7 @@ io.on('connection', (socket) => {
         };
 
         // Notify the main screen (projector)
-        socket.broadcast.emit('player_joined', { id: socket.id, username, team });
+        socket.broadcast.emit('player_joined', { id: socket.id, username, team, isAI: false });
 
         // Send a success message back to the player (include gameInProgress flag)
         socket.emit('joined_success', { username, team, gameInProgress: gameState.isStarted });
@@ -214,12 +552,65 @@ io.on('connection', (socket) => {
 
     socket.on('start_game', () => {
         // Force le redémarrage (réinitialise le jeu)
+        stopAllAI();
         initGame();
         io.emit('game_started', { currentCard: gameState.currentCard });
 
-        // Send individual hands
+        // Send individual hands (skip AI players)
         for (let playerId in gameState.players) {
-            io.to(playerId).emit('your_hand', gameState.players[playerId].hand);
+            if (!gameState.players[playerId].isAI) {
+                io.to(playerId).emit('your_hand', gameState.players[playerId].hand);
+            }
+        }
+    });
+
+    // Add AI player (from projector, before game starts)
+    socket.on('add_ai', () => {
+        if (gameState.isStarted) return;
+
+        // Count existing AI players
+        const aiCount = Object.values(gameState.players).filter(p => p.isAI).length;
+        if (aiCount >= MAX_AI_PLAYERS) {
+            socket.emit('ai_limit_reached', { max: MAX_AI_PLAYERS });
+            return;
+        }
+
+        const aiId = `ai_${++aiIdCounter}_${Date.now()}`;
+        const personality = AI_PERSONALITIES[Math.floor(Math.random() * AI_PERSONALITIES.length)];
+        
+        const suffixMap = { fast: '[noob AI]', medium: '[casual AI]', slow: '[pro AI]' };
+        const aiName = `${generateAIName()} ${suffixMap[personality]}`;
+
+        // Balance teams
+        const bluePlayers = Object.values(gameState.players).filter(p => p.team === 'blue').length;
+        const magentaPlayers = Object.values(gameState.players).filter(p => p.team === 'magenta').length;
+        const team = bluePlayers <= magentaPlayers ? 'blue' : 'magenta';
+
+        gameState.players[aiId] = {
+            id: aiId,
+            username: aiName,
+            hand: [],
+            team: team,
+            saidUno: false,
+            cured: false,
+            isAI: true,
+            aiPersonality: personality
+        };
+
+        console.log(`[AI] ${aiName} added (${personality}) to team ${team}`);
+
+        // Notify all clients about the new player
+        io.emit('player_joined', { id: aiId, username: aiName, team, isAI: true });
+    });
+
+    // Remove AI player (from projector, before game starts)
+    socket.on('remove_ai', (aiId) => {
+        if (gameState.isStarted) return;
+        const player = gameState.players[aiId];
+        if (player && player.isAI) {
+            delete gameState.players[aiId];
+            io.emit('player_left', aiId);
+            console.log(`[AI] ${player.username} removed`);
         }
     });
 
@@ -237,6 +628,7 @@ io.on('connection', (socket) => {
         if (!gameState.isStarted) return;
         gameState.isStarted = false;
         if (gameState.virusTimeout) clearTimeout(gameState.virusTimeout);
+        stopAllAI();
         io.emit('game_over', { winner: 'Partie terminée par l\'organisateur', team: 'none', forced: true });
     });
 
@@ -269,6 +661,7 @@ io.on('connection', (socket) => {
             player.hand.splice(cardIndex, 1);
 
             // Update center card : LOGIQUE CORRIGÉE POUR LES CARTES NOIRES
+            const previousColor = gameState.currentCard.color;
             if (cardToPlay.color === 'black') {
                 // Si la couleur choisie est valide, on l'applique. Sinon, on force 'red' par défaut.
                 const validColors = ['red', 'blue', 'green', 'yellow'];
@@ -278,6 +671,11 @@ io.on('connection', (socket) => {
                 gameState.currentCard = { ...cardToPlay, color: newColor };
             } else {
                 gameState.currentCard = cardToPlay;
+            }
+
+            // Reset AI timers if the pile color changed (simulates rethinking)
+            if (gameState.currentCard.color !== previousColor) {
+                resetAITimers();
             }
 
             // Jauge Logic
@@ -296,6 +694,7 @@ io.on('connection', (socket) => {
                  io.emit('game_over', { winner: winMsg, team: winningTeam });
                  gameState.isStarted = false;
                  if (gameState.virusTimeout) clearTimeout(gameState.virusTimeout);
+                 stopAllAI();
                  return; // On arrête là
             }
 
@@ -337,6 +736,7 @@ io.on('connection', (socket) => {
                 io.emit('game_over', { winner: player.username, team: player.team });
                 gameState.isStarted = false;
                 if (gameState.virusTimeout) clearTimeout(gameState.virusTimeout);
+                stopAllAI();
             }
             // Reset UNO state for next time
             player.saidUno = false;
