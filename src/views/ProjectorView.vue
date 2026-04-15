@@ -75,7 +75,7 @@
       </div>
     </div>
 
-    <!-- Footer: Add AI + Start -->
+    <!-- Footer: Add AI + Start + Duration -->
     <div class="lobby-footer">
       <button v-if="aiCount < 5" class="add-ai-btn" @click="addAI">
         🤖 Ajouter AI ({{ aiCount }}/5)
@@ -83,6 +83,14 @@
       <button class="start-btn" @click="startGame">
         🚀 DÉMARRER LA BATAILLE
       </button>
+      <div class="duration-selector">
+        <span class="duration-label">⏱ Durée</span>
+        <div class="duration-stepper">
+          <button class="stepper-btn" @click="setExpectedDuration(expectedMinutes - 1)" :disabled="expectedMinutes <= 1">−</button>
+          <span class="stepper-value">{{ expectedMinutes }} min</span>
+          <button class="stepper-btn" @click="setExpectedDuration(expectedMinutes + 1)" :disabled="expectedMinutes >= 5">+</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -91,6 +99,12 @@
     <!-- Header Level -->
     <div class="top-row-header">
       <h1 class="neon-text logo-left">NEON-UNO</h1>
+
+      <!-- Time info badge -->
+      <div class="time-info-badge">
+        <span class="time-elapsed">{{ elapsedDisplay }}</span>
+        <span class="time-mult" :class="timeMultClass">x{{ currentTimeMult }}</span>
+      </div>
       
       <!-- Top VS Bar -->
       <div class="vs-bar-container">
@@ -219,12 +233,26 @@ let cardIdCounter = 0
 const playerEmojis = reactive({})
 const emojiTimers = {}
 
+// Time tracking
+const expectedMinutes = ref(3)
+const expectedDurationSec = ref(180)
+const currentTimeMult = ref('0.70')
+const elapsedDisplay = ref('0:00')
+let timeUpdateInterval = null
+
 // Drag-and-drop state
 let draggedPlayerId = null
 
 const bluePlayers = computed(() => Object.values(players).filter(p => p.team === 'blue'))
 const magentaPlayers = computed(() => Object.values(players).filter(p => p.team === 'magenta'))
 const aiCount = computed(() => Object.values(players).filter(p => p.isAI).length)
+const timeMultClass = computed(() => {
+  const v = parseFloat(currentTimeMult.value)
+  if (v >= 3.0) return 'mult-extreme'
+  if (v >= 2.0) return 'mult-high'
+  if (v >= 1.2) return 'mult-medium'
+  return 'mult-low'
+})
 
 const baseColorMap = {
   red: '#2C0B0B',
@@ -292,6 +320,12 @@ function startGame() {
 
 function addAI() {
   socket.emit('add_ai')
+}
+
+function setExpectedDuration(minutes) {
+  const m = Math.max(1, Math.min(5, minutes))
+  expectedMinutes.value = m
+  socket.emit('set_expected_duration', m)
 }
 
 function removeAI(aiId) {
@@ -521,6 +555,31 @@ socket.on('game_started', (data) => {
   updateCenterCard(data.currentCard)
   blueWidth.value = 50
   magentaWidth.value = 50
+  if (data.expectedDuration) {
+    expectedDurationSec.value = data.expectedDuration
+    expectedMinutes.value = Math.round(data.expectedDuration / 60)
+  }
+  // Start elapsed timer
+  const startTime = Date.now()
+  if (timeUpdateInterval) clearInterval(timeUpdateInterval)
+  timeUpdateInterval = setInterval(() => {
+    const elapsed = (Date.now() - startTime) / 1000
+    const mins = Math.floor(elapsed / 60)
+    const secs = Math.floor(elapsed % 60)
+    elapsedDisplay.value = `${mins}:${secs.toString().padStart(2, '0')}`
+
+    // Compute time multiplier locally for display
+    const T = expectedDurationSec.value
+    const r = elapsed / T
+    let mult
+    if (r <= 1.0) {
+      mult = 0.7 + 2.5 * Math.pow(r, 1.45)
+    } else {
+      const exp = 1.45 + (r - 1.0) * 1.5
+      mult = 0.7 + 2.5 * Math.pow(r, exp)
+    }
+    currentTimeMult.value = mult.toFixed(2)
+  }, 500)
 })
 
 socket.on('card_played_success', (data) => {
@@ -571,6 +630,12 @@ socket.on('game_over', (data) => {
     ? data.winner
     : `VICTOIRE DE ${data.winner.toUpperCase()} !`
   winnerColor.value = data.team === 'blue' ? '#3498DB' : data.team === 'magenta' ? '#F572F7' : '#F1C40F'
+  if (timeUpdateInterval) { clearInterval(timeUpdateInterval); timeUpdateInterval = null }
+})
+
+socket.on('expected_duration_changed', (minutes) => {
+  expectedMinutes.value = minutes
+  expectedDurationSec.value = minutes * 60
 })
 
 socket.on('sync_state', (data) => {
@@ -605,6 +670,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (particleInterval) clearInterval(particleInterval)
   if (resizeObserver) resizeObserver.disconnect()
+  if (timeUpdateInterval) clearInterval(timeUpdateInterval)
   socket.off('player_joined')
   socket.off('player_left')
   socket.off('team_changed')
@@ -615,6 +681,7 @@ onUnmounted(() => {
   socket.off('player_emoji')
   socket.off('game_over')
   socket.off('sync_state')
+  socket.off('expected_duration_changed')
 })
 
 </script>
@@ -862,6 +929,110 @@ onUnmounted(() => {
 .start-btn:hover {
   transform: scale(1.04);
   box-shadow: 0 0 40px var(--neon-magenta), 0 0 80px rgba(245,114,247,0.5);
+}
+
+/* Duration Selector */
+.duration-selector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.duration-label {
+  color: rgba(255,255,255,0.6);
+  font-size: 0.95rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.duration-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 2px solid rgba(114, 239, 249, 0.3);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.stepper-btn {
+  width: 40px;
+  height: 40px;
+  font-size: 1.4rem;
+  font-weight: bold;
+  border: none;
+  background: rgba(114, 239, 249, 0.1);
+  color: #72EFF9;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.stepper-btn:hover:not(:disabled) {
+  background: rgba(114, 239, 249, 0.25);
+}
+
+.stepper-btn:disabled {
+  color: rgba(114, 239, 249, 0.25);
+  cursor: not-allowed;
+}
+
+.stepper-value {
+  padding: 0 14px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #72EFF9;
+  min-width: 60px;
+  text-align: center;
+}
+
+/* Time Info Badge (in-game header) */
+.time-info-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 18px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.time-elapsed {
+  font-size: 1.3rem;
+  color: rgba(255,255,255,0.7);
+  font-variant-numeric: tabular-nums;
+  font-family: monospace;
+}
+
+.time-mult {
+  font-size: 1.4rem;
+  font-weight: bold;
+  transition: color 0.5s, text-shadow 0.5s;
+}
+
+.mult-low {
+  color: rgba(114, 239, 249, 0.7);
+}
+
+.mult-medium {
+  color: #F1C40F;
+  text-shadow: 0 0 8px rgba(241, 196, 15, 0.5);
+}
+
+.mult-high {
+  color: #E67E22;
+  text-shadow: 0 0 12px rgba(230, 126, 34, 0.6);
+  animation: multPulse 1.5s infinite alternate;
+}
+
+.mult-extreme {
+  color: #E74C3C;
+  text-shadow: 0 0 20px rgba(231, 76, 60, 0.8);
+  animation: multPulse 0.8s infinite alternate;
+}
+
+@keyframes multPulse {
+  0% { opacity: 0.8; transform: scale(1); }
+  100% { opacity: 1; transform: scale(1.1); }
 }
 
 /* Full screen absolute canvas for lasers */

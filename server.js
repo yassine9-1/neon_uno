@@ -56,7 +56,9 @@ let gameState = {
     isStarted: false,
     scores: { blue: 50.0, magenta: 50.0 }, // Changed to float
     isVirus: false,
-    virusTimeout: null
+    virusTimeout: null,
+    expectedDuration: 180, // seconds (default 3 minutes)
+    gameStartTime: null    // timestamp when game started
 };
 
 function createDeck() {
@@ -111,8 +113,41 @@ function initGame() {
         gameState.players[playerId].cured = false;
     }
     gameState.isStarted = true;
+    gameState.gameStartTime = Date.now();
     scheduleVirus();
     startAIPlayers();
+}
+
+// --- TIME-BASED SCORE MULTIPLIER ---
+// Non-linear curve normalized to expectedDuration
+// At r=0: 0.7, at r≈0.33: ~1.2, at r≈0.67: ~2.0, at r=1.0: ~3.2
+// After r>1.0: exponent grows, causing rapidly accelerating scores
+function timeMultiplier() {
+    if (!gameState.gameStartTime) return 0.7;
+    const elapsed = (Date.now() - gameState.gameStartTime) / 1000; // seconds
+    const T = gameState.expectedDuration;
+    const r = elapsed / T; // ratio of elapsed / expected
+
+    if (r <= 1.0) {
+        // Base curve: 0.7 + 2.5 * r^1.45
+        return 0.7 + 2.5 * Math.pow(r, 1.45);
+    } else {
+        // Overtime: exponent grows with time, scores accelerate
+        const exponent = 1.45 + (r - 1.0) * 1.5;
+        return 0.7 + 2.5 * Math.pow(r, exponent);
+    }
+}
+
+// --- PLAYER COUNT MULTIPLIER ---
+// Fewer players = higher multiplier (compensates for slower scoring)
+// 2-3 players: 1.4x, 4-5: 1.0x, 8: ~0.6x, 15: ~0.3x, asymptote ~0.1x
+function playerCountMultiplier() {
+    const n = Object.keys(gameState.players).length;
+    if (n <= 1) return 1.4;
+    if (n <= 3) return 1.4;
+    if (n <= 5) return 1.0;
+    // Decay: 0.1 + 7 / (3n - 10)
+    return 0.1 + 7 / (3 * n - 10);
 }
 
 function refillDeckIfNeeded() {
@@ -455,12 +490,16 @@ function processPlayCard(playerId, cardId, chosenColor) {
         const baseScoreMap = { fast: 0.7, medium: 1.0, slow: 1.3 };
         baseScore = baseScoreMap[player.aiPersonality] || 1.0;
     } else {
-        baseScore = 2.0;
+        baseScore = 2.5;
     }
+    const timeMult = timeMultiplier();
+    const playerMult = playerCountMultiplier();
     const finalScore = baseScore
         * handCountMultiplier(player.hand.length)
         * colorVarietyMultiplier(player.hand)
-        * sameColorStreakMultiplier(player.consecutiveColorCount);
+        * sameColorStreakMultiplier(player.consecutiveColorCount)
+        * timeMult
+        * playerMult;
 
     if (player.team === 'blue') {
         gameState.scores.blue += finalScore;
@@ -541,6 +580,7 @@ function processPlayCard(playerId, cardId, chosenColor) {
         card: gameState.currentCard,
         scores: gameState.scores,
         scoreGained: finalScore.toFixed(1),
+        timeMultiplier: timeMult.toFixed(2),
         unoOupli: unoOupli
     });
 
@@ -830,11 +870,23 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('set_expected_duration', (minutes) => {
+        if (gameState.isStarted) return;
+        const m = parseInt(minutes);
+        if (m >= 1 && m <= 5) {
+            gameState.expectedDuration = m * 60;
+            io.emit('expected_duration_changed', m);
+        }
+    });
+
     socket.on('start_game', () => {
         // Force le redémarrage (réinitialise le jeu)
         stopAllAI();
         initGame();
-        io.emit('game_started', { currentCard: gameState.currentCard });
+        io.emit('game_started', {
+            currentCard: gameState.currentCard,
+            expectedDuration: gameState.expectedDuration
+        });
 
         // Send individual hands (skip AI players)
         for (let playerId in gameState.players) {
