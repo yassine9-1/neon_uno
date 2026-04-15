@@ -407,12 +407,35 @@ watch(queueSize, (newSize) => {
   }
 })
 
-function showFeedback(text, color) {
+function showFeedback(text, color, scoreGained = null, playerPos = null) {
   const el = document.createElement('div')
   el.innerText = text
   el.className = 'play-feedback neon-text'
   if (color) el.style.color = color
   document.body.appendChild(el)
+  
+  if (scoreGained && playerPos) {
+    const scoreEl = document.createElement('div')
+    scoreEl.innerText = `+${scoreGained}`
+    const glowColor = color || (playerPos.team === 'blue' ? '#72EFF9' : '#F572F7')
+    scoreEl.style.cssText = `
+      position: fixed;
+      left: ${playerPos.x}%;
+      top: ${playerPos.y - 5}%;
+      font-size: 2.5rem;
+      font-weight: 900;
+      font-family: 'Orbitron', sans-serif;
+      color: ${glowColor};
+      text-shadow: 0 0 10px ${glowColor}, 0 0 30px ${glowColor}, 0 0 50px ${glowColor};
+      pointer-events: none;
+      z-index: 1000;
+      transform: translate(-50%, -50%);
+      animation: scoreFloat 1.5s ease-out forwards;
+    `
+    document.body.appendChild(scoreEl)
+    setTimeout(() => scoreEl.remove(), 1500)
+  }
+
   setTimeout(() => el.remove(), 2000)
 }
 
@@ -498,10 +521,13 @@ socket.on('card_played_success', (data) => {
   createExplosion()
   fireLaser(data.username)
 
+  const p = positionedPlayers.value.find(pl => pl.username === data.username)
+  const teamColor = p ? (p.team === 'blue' ? '#72EFF9' : '#F572F7') : null
+
   if (data.unoOupli) {
-    showFeedback(`OBLI DE UNO ! +2 pour ${data.username}`, '#E74C3C')
+    showFeedback(`OBLI DE UNO ! +2 pour ${data.username}`, '#E74C3C', data.scoreGained, p)
   } else {
-    showFeedback(`${data.username} a joué !`)
+    showFeedback(`${data.username} a joué !`, teamColor, data.scoreGained, p)
   }
 })
 
@@ -1114,5 +1140,13 @@ onUnmounted(() => {
 
 .pile-card {
   animation: cardEnterFlash 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+</style>
+
+<style>
+/* Global (non-scoped) keyframe for dynamically created score popups on document.body */
+@keyframes scoreFloat {
+  0% { transform: translate(-50%, -50%) translateY(0); opacity: 1; }
+  100% { transform: translate(-50%, -50%) translateY(-60px); opacity: 0; }
 }
 </style>

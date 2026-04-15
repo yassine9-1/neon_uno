@@ -49,7 +49,7 @@ let gameState = {
     currentCard: null,
     players: {},
     isStarted: false,
-    scores: { blue: 50, magenta: 50 },
+    scores: { blue: 50.0, magenta: 50.0 }, // Changed to float
     isVirus: false,
     virusTimeout: null
 };
@@ -95,7 +95,7 @@ function initGame() {
     refillDeckIfNeeded();
 
     // Reset Game State
-    gameState.scores = { blue: 50, magenta: 50 };
+    gameState.scores = { blue: 50.0, magenta: 50.0 };
     gameState.isVirus = false;
     if (gameState.virusTimeout) clearTimeout(gameState.virusTimeout);
 
@@ -127,6 +127,40 @@ function scheduleVirus() {
     gameState.virusTimeout = setTimeout(() => {
         triggerVirus();
     }, delay);
+}
+
+// --- NEW SCORING LOGIC ---
+function handCountMultiplier(n) {
+    if (n <= 0) return 1.8; // Max reward for being empty-handed
+    if (n <= 4) {
+        // 1-4张：从 1.8 → 1.0 (非线性)
+        return 1.0 + 0.8 * Math.pow((5 - n) / 4, 1.5);
+    } else if (n <= 7) {
+        // 5-7张：基准区，×1.0
+        return 1.0;
+    } else {
+        // 超过7张：从 1.0 快速下降到 0.4 (10张时) 并趋近于 0.3
+        return 0.3 + 0.7 * Math.exp(-(n - 7) / 1.5);
+    }
+}
+
+function colorVarietyMultiplier(hand) {
+    // 统计手牌的颜色种类数 (包括黑牌)
+    const colorSet = new Set(hand.map(c => c.color));
+    const uniqueColors = colorSet.size;
+
+    if (uniqueColors === 0) return 1.8; // Empty hand bonus
+    
+    // 自定义映射：1色:1.8, 2色:1.3, 3色:1.0, 4色:0.7, 5色:0.3
+    const map = {
+        1: 1.8,
+        2: 1.3,
+        3: 1.0,
+        4: 0.7,
+        5: 0.3
+    };
+    
+    return map[uniqueColors] || 0.3;
 }
 
 // --- AI PLAY LOGIC ---
@@ -302,13 +336,16 @@ function aiPlayCard(aiId) {
         resetAITimers();
     }
 
-    // AI score contribution is 1 (not 2)
+    // AI score contribution
+    const baseScore = 1.0;
+    const finalScore = baseScore * handCountMultiplier(player.hand.length) * colorVarietyMultiplier(player.hand);
+    
     if (player.team === 'blue') {
-        gameState.scores.blue += 1;
-        gameState.scores.magenta -= 1;
+        gameState.scores.blue += finalScore;
+        gameState.scores.magenta -= finalScore;
     } else {
-        gameState.scores.magenta += 1;
-        gameState.scores.blue -= 1;
+        gameState.scores.magenta += finalScore;
+        gameState.scores.blue -= finalScore;
     }
 
     // Check win by gauge
@@ -368,11 +405,6 @@ function aiPlayCard(aiId) {
         if (gameState.deck.length >= 2) {
             player.hand.push(gameState.deck.pop(), gameState.deck.pop());
         }
-    } else if (player.hand.length === 0) {
-        io.emit('game_over', { winner: player.username, team: player.team });
-        gameState.isStarted = false;
-        if (gameState.virusTimeout) clearTimeout(gameState.virusTimeout);
-        stopAllAI();
     }
     player.saidUno = false;
 
@@ -382,6 +414,7 @@ function aiPlayCard(aiId) {
         username: player.username,
         card: gameState.currentCard,
         scores: gameState.scores,
+        scoreGained: finalScore.toFixed(1),
         unoOupli: unoOupli
     });
 }
@@ -492,12 +525,25 @@ app.get('/api/server-info', async (req, res) => {
     let localIp = 'localhost';
 
     for (const name of Object.keys(interfaces)) {
+        // Ignorer les interfaces virtuelles connues (VMware, VirtualBox, vEthernet, etc.)
+        const lowerName = name.toLowerCase();
+        if (lowerName.includes('vmware') || 
+            lowerName.includes('virtualbox') || 
+            lowerName.includes('vbox') || 
+            lowerName.includes('vnet') || 
+            lowerName.includes('virtual') ||
+            lowerName.includes('vethernet')) {
+            continue;
+        }
+
         for (const iface of interfaces[name]) {
             if (iface.family === 'IPv4' && !iface.internal) {
                 localIp = iface.address;
-                break;
+                // Si on trouve une adresse en 192.168.x.x, c'est très probablement le réseau LAN, on s'arrête là
+                if (localIp.startsWith('192.168.')) break;
             }
         }
+        if (localIp !== 'localhost' && localIp.startsWith('192.168.')) break;
     }
 
     // NOUVEAU : En mode dev, on pointe vers le serveur Vite (5173)
@@ -679,12 +725,15 @@ io.on('connection', (socket) => {
             }
 
             // Jauge Logic
+            const baseScore = 2.0;
+            const finalScore = baseScore * handCountMultiplier(player.hand.length) * colorVarietyMultiplier(player.hand);
+
             if (player.team === 'blue') {
-                gameState.scores.blue += 2;
-                gameState.scores.magenta -= 2;
+                gameState.scores.blue += finalScore;
+                gameState.scores.magenta -= finalScore;
             } else {
-                gameState.scores.magenta += 2;
-                gameState.scores.blue -= 2;
+                gameState.scores.magenta += finalScore;
+                gameState.scores.blue -= finalScore;
             }
 
             // Vérification de victoire par JAUGE d'Équipe !
@@ -731,12 +780,6 @@ io.on('connection', (socket) => {
                 if (gameState.deck.length >= 2) {
                     player.hand.push(gameState.deck.pop(), gameState.deck.pop()); // pénalité +2
                 }
-            } else if (player.hand.length === 0) {
-                // GAGNANT !
-                io.emit('game_over', { winner: player.username, team: player.team });
-                gameState.isStarted = false;
-                if (gameState.virusTimeout) clearTimeout(gameState.virusTimeout);
-                stopAllAI();
             }
             // Reset UNO state for next time
             player.saidUno = false;
@@ -748,6 +791,7 @@ io.on('connection', (socket) => {
                 // On envoie la carte mise à jour (avec sa nouvelle couleur si c'était une carte noire)
                 card: gameState.currentCard, 
                 scores: gameState.scores,
+                scoreGained: finalScore.toFixed(1),
                 unoOupli: unoOupli
             });
 
@@ -802,5 +846,5 @@ app.get('*', (req, res) => {
 });
 
 server.listen(PORT, () => {
-    console.log(`[SERVER] NEON-UNO running on http://localhost:${PORT}`);
+    console.log(`[SERVER] NEON-UNO running on https://localhost:${PORT}`);
 });

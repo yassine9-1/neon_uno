@@ -59,7 +59,11 @@
         Capteurs
       </button>
 
-      <div class="hint"><b>SWIPE UP</b> ou <b>LANCER</b> pour jouer.<br /><b>SECOUER</b> pour piocher.</div>
+      <div class="hint">
+        <span v-if="currentHand.length > 0"><b>SWIPE UP</b> ou <b>LANCER</b> pour jouer.</span>
+        <span v-else style="color:#F1C40F;font-weight:bold;animation:pulse 0.5s infinite alternate;">⚠️ L'ÉCRAN EST VIDE ! <br/>SWIPE UP sur la pile de gauche pour piocher !</span>
+        <br /><b>SECOUER</b> pour piocher.
+      </div>
     </div>
 
     <div class="hand-container" ref="handContainer" @scroll="handleScroll">
@@ -84,7 +88,7 @@
 
       <!-- Hand cards -->
       <div
-        v-for="card in currentHand"
+        v-for="card in sortedHand"
         :key="card.id"
         :data-id="card.id"
         class="my-card"
@@ -124,6 +128,15 @@ const usernameInput = ref('')
 const username = ref('')
 const myTeam = ref('')
 const currentHand = ref([])
+const colorOrder = ['red', 'blue', 'green', 'yellow', 'black']
+
+const sortedHand = computed(() => {
+  // Use a stable sort to group by color while maintaining the order of cards within each color group
+  return [...currentHand.value].sort((a, b) => {
+    return colorOrder.indexOf(a.color) - colorOrder.indexOf(b.color)
+  })
+})
+
 const isVirus = ref(false)
 const isFrozen = ref(false)
 const handContainer = ref(null)
@@ -509,7 +522,7 @@ function handleKeydown(e) {
     return
   }
 
-  const cardIds = ['draw', ...currentHand.value.map(c => c.id)]
+  const cardIds = ['draw', ...sortedHand.value.map(c => c.id)]
   let index = cardIds.indexOf(focusedCardId.value)
 
   if (e.key === 'ArrowLeft') {
